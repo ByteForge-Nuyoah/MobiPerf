@@ -111,9 +111,9 @@ async def register(user_data: UserCreate):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已被注册"
             )
-    
+
     hashed_password = AuthService.hash_password(user_data.password)
-    
+
     user = await create_user_in_db({
         'username': user_data.username,
         'email': user_data.email,
@@ -121,20 +121,20 @@ async def register(user_data: UserCreate):
         'full_name': user_data.full_name,
         'role': 'viewer'
     })
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="创建用户失败"
         )
-    
+
     access_token = AuthService.create_access_token(
         data={"sub": str(user['id']), "username": user['username'], "role": user['role']}
     )
     refresh_token = AuthService.create_refresh_token(
         data={"sub": str(user['id'])}
     )
-    
+
     logger.info(f"New user registered: {user_data.username}")
     
     return {
