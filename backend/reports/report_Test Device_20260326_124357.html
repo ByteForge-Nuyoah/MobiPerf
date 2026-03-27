@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MobiPerf 性能测试报告</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .header .meta {
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .score-section {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .score-circle.excellent {
+            background: linear-gradient(135deg, #67c23a, #95d475);
+            color: white;
+        }
+        
+        .score-circle.good {
+            background: linear-gradient(135deg, #409eff, #79bbff);
+            color: white;
+        }
+        
+        .score-circle.fair {
+            background: linear-gradient(135deg, #e6a23c, #f3d19e);
+            color: white;
+        }
+        
+        .score-circle.poor {
+            background: linear-gradient(135deg, #f56c6c, #fab6b6);
+            color: white;
+        }
+        
+        .score-value {
+            font-size: 48px;
+            line-height: 1;
+        }
+        
+        .score-label {
+            font-size: 14px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+        
+        .score-details {
+            flex: 1;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            color: #606266;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #303133;
+        }
+        
+        .detail-value.level-excellent { color: #67c23a; }
+        .detail-value.level-good { color: #409eff; }
+        .detail-value.level-fair { color: #e6a23c; }
+        .detail-value.level-poor { color: #f56c6c; }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .metric-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .metric-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #303133;
+        }
+        
+        .metric-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .metric-badge.level-excellent { background: #f0f9ff; color: #67c23a; }
+        .metric-badge.level-good { background: #ecf5ff; color: #409eff; }
+        .metric-badge.level-fair { background: #fdf6ec; color: #e6a23c; }
+        .metric-badge.level-poor { background: #fef0f0; color: #f56c6c; }
+        
+        .metric-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #606266;
+            font-size: 14px;
+        }
+        
+        .metric-value {
+            color: #303133;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .metric-value.warning {
+            color: #f56c6c;
+        }
+        
+        .recommendations {
+            background: #fff7e6;
+            border: 1px solid #ffd591;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .recommendation-item {
+            position: relative;
+            padding: 12px 0 12px 30px;
+            color: #606266;
+            font-size: 14px;
+            line-height: 1.6;
+            border-bottom: 1px solid #ffe7ba;
+        }
+        
+        .recommendation-item:last-child {
+            border-bottom: none;
+        }
+        
+        .recommendation-item::before {
+            content: '💡';
+            position: absolute;
+            left: 0;
+            top: 12px;
+            font-size: 14px;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #909399;
+            font-size: 12px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .chart-placeholder {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #909399;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+            
+            .score-circle {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MobiPerf 性能测试报告</h1>
+            <div class="subtitle">移动应用性能分析报告</div>
+            <div class="meta">
+                <span id="report-time">生成时间: 2026-03-26 12:43:57</span>
+                <span style="margin: 0 20px;">|</span>
+                <span id="device-info">设备: Test Device</span>
+                <span style="margin: 0 20px;">|</span>
+                <span id="app-info">应用: com.spreadwin.tuyun</span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2 class="section-title">📊 综合评分</h2>
+                <div class="score-section">
+                    <div class="score-circle poor">
+                        <div class="score-value">45.0</div>
+                        <div class="score-label">综合评分</div>
+                    </div>
+                    <div class="score-details">
+                        <div class="detail-item">
+                            <span class="detail-label">FPS 稳定性</span>
+                            <span class="detail-value level-poor">较差</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">内存泄漏风险</span>
+                            <span class="detail-value level-poor">高风险</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">热节流风险</span>
+                            <span class="detail-value level-excellent">低风险</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2 class="section-title">📈 详细指标</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-title">FPS 稳定性</span>
+                            <span class="metric-badge level-poor">较差</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-row">
+                                <span class="metric-label">平均 FPS</span>
+                                <span class="metric-value">4.15</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">FPS 范围</span>
+                                <span class="metric-value">0.0 - 30.0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">标准差</span>
+                                <span class="metric-value">9.81</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">卡顿率</span>
+                                <span class="metric-value ">1.85%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">严重卡顿</span>
+                                <span class="metric-value ">0 次</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-title">内存趋势</span>
+                            <span class="metric-badge level-poor">高风险</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-row">
+                                <span class="metric-label">当前内存</span>
+                                <span class="metric-value">305.8 MB</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">平均内存</span>
+                                <span class="metric-value">188.32 MB</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">峰值内存</span>
+                                <span class="metric-value">310.2 MB</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">增长趋势</span>
+                                <span class="metric-value">📈 快速上升</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">内存波动</span>
+                                <span class="metric-value ">0 次峰值</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-title">CPU 使用</span>
+                            <span class="metric-badge">➡️ 稳定</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-row">
+                                <span class="metric-label">当前 CPU</span>
+                                <span class="metric-value ">0.0%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">平均 CPU</span>
+                                <span class="metric-value">5.7%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">CPU 范围</span>
+                                <span class="metric-value">0.0% - 74.1%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-title">GPU 使用</span>
+                            <span class="metric-badge">➡️ 稳定</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-row">
+                                <span class="metric-label">当前 GPU</span>
+                                <span class="metric-value ">0.0%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">平均 GPU</span>
+                                <span class="metric-value">0.0%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">GPU 范围</span>
+                                <span class="metric-value">0.0% - 0.0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="metric-title">电池温度</span>
+                            <span class="metric-badge level-excellent">低风险</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-row">
+                                <span class="metric-label">当前温度</span>
+                                <span class="metric-value ">27.1°C</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">平均温度</span>
+                                <span class="metric-value">16.7°C</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">温度范围</span>
+                                <span class="metric-value">0.0°C - 27.1°C</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">温度趋势</span>
+                                <span class="metric-value">📊 上升</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2 class="section-title">💡 优化建议</h2>
+                <div class="recommendations">
+                    <div class="recommendation-item">FPS 稳定性较差，建议检查主线程耗时操作</div>
+<div class="recommendation-item">检测到内存泄漏风险，建议使用 Memory Profiler 排查</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>本报告由 MobiPerf 自动生成 | Powered by FastAPI + Vue3</p>
+            <p style="margin-top: 5px;">生成时间: 2026-03-26 12:43:57</p>
+        </div>
+    </div>
+</body>
+</html>

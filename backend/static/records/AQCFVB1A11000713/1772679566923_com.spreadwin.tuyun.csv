@@ -1,0 +1,7 @@
+timestamp,package,cpu(%),memory(MB),fps,jank,stutter(%),gpu(%),battery.level,battery.voltage(mV),battery.temp(C),battery.current(mA),network.rx(KB/s),network.tx(KB/s)
+1772679566925,com.spreadwin.tuyun,107.0,139.9,1,0,0.0,0.0,60,4042,26.3,0,0.0,0.0
+1772679569337,com.spreadwin.tuyun,133.0,168.8,0,0,0.0,0.0,60,4024,26.5,0,0.0,0.0
+1772679571657,com.spreadwin.tuyun,12.5,179.5,0,0,0.0,0.0,60,4024,26.5,0,0.0,0.0
+1772679574653,com.spreadwin.tuyun,0.0,178.6,20,2,15.8,0.0,60,4024,26.5,0,0.0,0.0
+1772679577557,com.spreadwin.tuyun,0.0,177.9,0,0,0.0,0.0,60,4024,26.5,0,0.0,0.0
+1772679580366,com.spreadwin.tuyun,0.0,178.4,0,0,0.0,0.0,60,4024,26.5,0,0.0,0.0

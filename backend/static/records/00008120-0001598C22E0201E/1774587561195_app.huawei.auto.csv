@@ -1,0 +1,1 @@
+timestamp,package,cpu(%),memory(MB),fps,jank,stutter(%),gpu(%),battery.level,battery.voltage(mV),battery.temp(C),battery.current(mA),network.rx(KB/s),network.tx(KB/s)
