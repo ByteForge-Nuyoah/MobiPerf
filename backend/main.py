@@ -171,6 +171,11 @@ LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 app.mount("/logs", StaticFiles(directory=LOG_DIR), name="logs")
 
+# Serve frontend static files
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -884,6 +889,14 @@ async def notification_websocket_endpoint(websocket: WebSocket):
         logger.error(f"Notification WebSocket error: {e}")
     finally:
         notification_service.unregister_websocket_callback(send_notification)
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve frontend SPA"""
+    frontend_index = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist", "index.html")
+    if os.path.exists(frontend_index):
+        return FileResponse(frontend_index)
+    return {"error": "Frontend not found. Please build the frontend first."}
 
 if __name__ == "__main__":
     import uvicorn
