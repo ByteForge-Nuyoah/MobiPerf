@@ -438,8 +438,8 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
     report_generator = ReportGenerator()
     
     session_id = str(uuid.uuid4())
-    current_session_id = None
     session_start_time = None
+    session_created = False
     
     csv_file = None
     csv_writer = None
@@ -485,7 +485,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                     if isinstance(data, dict) and data.get("type") == "monitor":
                         analyzer.add_metrics(data)
                         
-                        if repository and current_session_id:
+                        if repository and session_created:
                             try:
                                 await repository.save_performance_metrics(session_id, data)
                                 
@@ -509,7 +509,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                             })
                             
                             # 保存分析结果到数据库
-                            if repository and current_session_id:
+                            if repository and session_created:
                                 try:
                                     await repository.save_fps_analysis(session_id, analysis_result.get('fps', {}))
                                     await repository.save_memory_analysis(session_id, analysis_result.get('memory', {}))
@@ -560,14 +560,18 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                         if repository:
                             try:
                                 session_start_time = datetime.now()
-                                current_session_id = await repository.create_test_session({
+                                created_id = await repository.create_test_session({
                                     'session_id': session_id,
                                     'device_model': collector.device_model if hasattr(collector, 'device_model') else 'Unknown',
                                     'device_serial': serial,
                                     'app_package': target,
                                     'start_time': session_start_time
                                 })
-                                logger.info(f"Created database session: {session_id}")
+                                if created_id:
+                                    session_created = True
+                                    logger.info(f"Created database session: {session_id}")
+                                else:
+                                    logger.warning(f"Failed to create database session: {session_id}")
                             except Exception as e:
                                 logger.error(f"Failed to create database session: {e}")
                         
@@ -592,7 +596,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                         analyzer.reset()
                         
                         # 更新数据库会话状态
-                        if repository and current_session_id:
+                        if repository and session_created:
                             try:
                                 end_time = datetime.now()
                                 duration = int((end_time - session_start_time).total_seconds()) if session_start_time else 0
@@ -601,9 +605,11 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                                     'status': 'completed',
                                     'duration': duration
                                 })
-                                logger.info(f"Updated database session: {session_id}")
+                                logger.info(f"Updated database session: {session_id}, duration: {duration}s")
                             except Exception as e:
                                 logger.error(f"Failed to update database session: {e}")
+                        
+                        session_created = False
                         
                         # finalize CSV
                         try:

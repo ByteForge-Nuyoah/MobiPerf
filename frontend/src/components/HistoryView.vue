@@ -1,78 +1,98 @@
 <template>
-  <div class="history-view">
-    <div class="header">
-      <h2>历史测试记录</h2>
-      <div class="filters">
-        <input 
-          v-model="searchQuery" 
-          placeholder="搜索应用包名..." 
-          class="search-input"
-          @keyup.enter="handleSearch"
-        >
-        <button @click="handleSearch" class="search-btn">🔍 搜索</button>
-        <button @click="loadSessions" class="refresh-btn">🔄 刷新</button>
+  <div class="history-container">
+    <div class="history-header">
+      <div class="header-left">
+        <h2 class="header-title">历史测试记录</h2>
+        <p class="header-subtitle">查看和管理您的性能测试历史</p>
+      </div>
+      <div class="header-actions">
+        <div class="search-box">
+          <input 
+            v-model="searchQuery" 
+            placeholder="搜索应用包名..." 
+            class="search-input"
+            @keyup.enter="handleSearch"
+          >
+        </div>
+        <button @click="handleSearch" class="action-btn primary-btn">
+          <span class="btn-icon">🔍</span>
+          <span class="btn-text">搜索</span>
+        </button>
+        <button @click="loadSessions" class="action-btn secondary-btn">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text">刷新</span>
+        </button>
       </div>
     </div>
 
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-      <p>加载中...</p>
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">加载中...</p>
     </div>
 
-    <div v-else-if="error" class="error-message">
-      ❌ {{ error }}
+    <div v-else-if="error" class="error-state">
+      <span class="error-icon">❌</span>
+      <span class="error-text">{{ error }}</span>
     </div>
 
-    <div v-else-if="sessions.length === 0" class="no-data">
-      <div class="no-data-icon">📊</div>
-      <div class="no-data-text">暂无测试记录</div>
+    <div v-else-if="sessions.length === 0" class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">暂无测试记录</div>
+      <div class="empty-desc">开始您的第一次性能测试吧</div>
     </div>
 
-    <div v-else class="sessions-list">
+    <div v-else class="sessions-grid">
       <div 
         v-for="session in sessions" 
         :key="session.session_id" 
         class="session-card"
         @click="viewSessionDetail(session.session_id)"
       >
-        <div class="session-header">
-          <div class="session-title">
-            <span class="app-package">{{ session.app_package || 'Unknown App' }}</span>
-            <span class="session-status" :class="`status-${session.status}`">
-              {{ getStatusText(session.status) }}
-            </span>
+        <div class="card-header">
+          <div class="card-title">
+            <span class="app-icon">📱</span>
+            <span class="app-name">{{ session.app_package || 'Unknown App' }}</span>
           </div>
-          <div class="session-time">{{ formatTime(session.start_time) }}</div>
+          <span class="session-status" :class="`status-${session.status}`">
+            {{ getStatusText(session.status) }}
+          </span>
         </div>
 
-        <div class="session-body">
-          <div class="info-row">
-            <span class="info-label">📱 设备:</span>
+        <div class="card-body">
+          <div class="info-item">
+            <span class="info-icon">📱</span>
+            <span class="info-label">设备</span>
             <span class="info-value">{{ session.device_model || 'Unknown' }}</span>
           </div>
-          <div class="info-row">
-            <span class="info-label">📦 包名:</span>
+          <div class="info-item">
+            <span class="info-icon">📦</span>
+            <span class="info-label">包名</span>
             <span class="info-value">{{ session.app_package || 'Unknown' }}</span>
           </div>
-          <div class="info-row" v-if="session.duration">
-            <span class="info-label">⏱️ 时长:</span>
+          <div class="info-item" v-if="session.duration">
+            <span class="info-icon">⏱️</span>
+            <span class="info-label">时长</span>
             <span class="info-value">{{ formatDuration(session.duration) }}</span>
           </div>
-          <div class="info-row" v-if="session.overall_score">
-            <span class="info-label">📊 评分:</span>
-            <span class="info-value score" :class="getScoreClass(session.overall_score)">
+          <div class="info-item" v-if="session.overall_score">
+            <span class="info-icon">📊</span>
+            <span class="info-label">评分</span>
+            <span class="info-value score-badge" :class="getScoreClass(session.overall_score)">
               {{ session.overall_score }}
             </span>
           </div>
         </div>
 
-        <div class="session-actions">
-          <button @click.stop="viewSessionDetail(session.session_id)" class="action-btn">
-            📋 查看详情
-          </button>
-          <button @click.stop="deleteSession(session.session_id)" class="action-btn delete-btn">
-            🗑️ 删除
-          </button>
+        <div class="card-footer">
+          <span class="session-time">{{ formatTime(session.start_time) }}</span>
+          <div class="card-actions">
+            <button @click.stop="viewSessionDetail(session.session_id)" class="card-btn view-btn">
+              查看详情
+            </button>
+            <button @click.stop="deleteSession(session.session_id)" class="card-btn delete-btn">
+              删除
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -245,74 +265,382 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.history-view {
+.history-container {
   width: 100%;
   height: 100%;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  padding: 20px;
+  background: var(--bg-primary);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.header {
+.history-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #e9ecef;
+  align-items: flex-start;
+  padding: var(--spacing-5) var(--spacing-6);
+  border-bottom: 1px solid var(--border-light);
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
 }
 
-.header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.filters {
+.header-left {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.header-title {
+  margin: 0;
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.header-subtitle {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-tertiary);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  position: relative;
 }
 
 .search-input {
-  padding: 8px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  font-size: 14px;
-  width: 250px;
+  width: 260px;
+  padding: var(--spacing-2) var(--spacing-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
 }
 
-.search-btn, .refresh-btn {
-  padding: 8px 16px;
-  background: #409eff;
-  color: white;
-  border: none;
-  border-radius: 4px;
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+  font-weight: var(--font-medium);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
+  white-space: nowrap;
 }
 
-.search-btn:hover, .refresh-btn:hover {
-  background: #66b1ff;
+.primary-btn {
+  background: var(--primary-500);
+  color: white;
+  border-color: var(--primary-500);
 }
 
-.loading {
+.primary-btn:hover {
+  background: var(--primary-600);
+  border-color: var(--primary-600);
+}
+
+.secondary-btn {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.secondary-btn:hover {
+  background: var(--gray-50);
+  color: var(--text-primary);
+}
+
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: var(--spacing-12);
+  gap: var(--spacing-4);
 }
 
-.spinner {
+.loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #409eff;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: var(--text-tertiary);
+  font-size: var(--font-sm);
+}
+
+.error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-6);
+  color: var(--danger-500);
+  font-size: var(--font-base);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12);
+  gap: var(--spacing-3);
+}
+
+.empty-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.empty-desc {
+  font-size: var(--font-sm);
+  color: var(--text-tertiary);
+}
+
+.sessions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--spacing-4);
+  padding: var(--spacing-5) var(--spacing-6);
+}
+
+.session-card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+  padding: var(--spacing-4);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.session-card:hover {
+  border-color: var(--primary-200);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-3);
+  padding-bottom: var(--spacing-3);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.app-icon {
+  font-size: 18px;
+}
+
+.app-name {
+  font-weight: var(--font-semibold);
+  font-size: var(--font-base);
+  color: var(--text-primary);
+}
+
+.session-status {
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  font-weight: var(--font-medium);
+}
+
+.status-running {
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+
+.status-completed {
+  background: var(--success-50);
+  color: var(--success-600);
+}
+
+.status-error {
+  background: var(--danger-50);
+  color: var(--danger-600);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-3);
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-sm);
+}
+
+.info-icon {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.info-label {
+  color: var(--text-tertiary);
+  min-width: 40px;
+}
+
+.info-value {
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
+
+.score-badge {
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-semibold);
+}
+
+.score-excellent {
+  background: var(--success-50);
+  color: var(--success-600);
+}
+
+.score-good {
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+
+.score-fair {
+  background: var(--warning-50);
+  color: var(--warning-600);
+}
+
+.score-poor {
+  background: var(--danger-50);
+  color: var(--danger-600);
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--border-light);
+}
+
+.session-time {
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+}
+
+.card-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.card-btn {
+  padding: var(--spacing-2) var(--spacing-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-xs);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.view-btn {
+  background: var(--primary-500);
+  color: white;
+  border-color: var(--primary-500);
+}
+
+.view-btn:hover {
+  background: var(--primary-600);
+  border-color: var(--primary-600);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.delete-btn {
+  background: var(--bg-primary);
+  color: var(--danger-600);
+  border-color: var(--danger-300);
+}
+
+.delete-btn:hover {
+  background: var(--danger-500);
+  color: white;
+  border-color: var(--danger-500);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid var(--border-light);
+}
+
+.page-btn {
+  padding: var(--spacing-2) var(--spacing-5);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--primary-50);
+  border-color: var(--primary-500);
+  color: var(--primary-600);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
 }
 
 @keyframes spin {
@@ -320,205 +648,54 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-.error-message {
-  text-align: center;
-  padding: 20px;
-  color: #f56c6c;
-  font-size: 16px;
+@media (max-width: 768px) {
+  .history-header {
+    padding: var(--spacing-4);
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .sessions-grid {
+    padding: var(--spacing-4);
+    grid-template-columns: 1fr;
+  }
+  
+  .pagination {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
 }
 
-.no-data {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px;
-  color: #909399;
-}
-
-.no-data-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  opacity: 0.5;
-}
-
-.no-data-text {
-  font-size: 18px;
-}
-
-.sessions-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.session-card {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid #e9ecef;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.session-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  transform: translateY(-2px);
-}
-
-.session-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.session-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.app-package {
-  font-weight: 600;
-  font-size: 16px;
-  color: #303133;
-}
-
-.session-status {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-running {
-  background: #e3f2fd;
-  color: #409eff;
-}
-
-.status-completed {
-  background: #f1f8e9;
-  color: #67c23a;
-}
-
-.status-error {
-  background: #fee;
-  color: #f56c6c;
-}
-
-.session-time {
-  font-size: 13px;
-  color: #909399;
-}
-
-.session-body {
-  margin-bottom: 12px;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 14px;
-}
-
-.info-label {
-  color: #606266;
-  margin-right: 8px;
-}
-
-.info-value {
-  color: #303133;
-  font-weight: 500;
-}
-
-.info-value.score {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-.score-excellent {
-  background: #f1f8e9;
-  color: #67c23a;
-}
-
-.score-good {
-  background: #e3f2fd;
-  color: #409eff;
-}
-
-.score-fair {
-  background: #fef9e7;
-  color: #e6a23c;
-}
-
-.score-poor {
-  background: #fee;
-  color: #f56c6c;
-}
-
-.session-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  flex: 1;
-  padding: 6px 12px;
-  background: white;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.3s;
-}
-
-.action-btn:hover {
-  background: #ecf5ff;
-  border-color: #409eff;
-  color: #409eff;
-}
-
-.delete-btn:hover {
-  background: #fef0f0;
-  border-color: #f56c6c;
-  color: #f56c6c;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.page-btn {
-  padding: 8px 20px;
-  background: #409eff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.page-btn:disabled {
-  background: #dcdfe6;
-  cursor: not-allowed;
-}
-
-.page-btn:not(:disabled):hover {
-  background: #66b1ff;
-}
-
-.page-info {
-  font-size: 14px;
-  color: #606266;
+@media (max-width: 480px) {
+  .btn-text {
+    display: none;
+  }
+  
+  .card-footer {
+    flex-direction: column;
+    gap: var(--spacing-2);
+    align-items: stretch;
+  }
+  
+  .card-actions {
+    justify-content: stretch;
+  }
+  
+  .card-btn {
+    flex: 1;
+    text-align: center;
+  }
 }
 </style>

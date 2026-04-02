@@ -186,6 +186,33 @@ export const useMonitorStore = () => {
   }
 
   const disconnectWs = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const msg = { type: "stop" }
+      ws.send(JSON.stringify(msg))
+      console.log('Store: Sent stop message to server')
+      
+      // Wait a bit for the server to process the stop message before closing
+      setTimeout(() => {
+        if (ws) {
+          ws.onclose = null
+          ws.close(1000, 'Client disconnect')
+          ws = null
+        }
+        state.isConnected = false
+        state.isReconnecting = false
+      }, 500)
+      
+      currentSerial = null
+      currentTarget = null
+      state.reconnectAttempts = 0
+      
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+      return
+    }
+    
     currentSerial = null
     currentTarget = null
     state.reconnectAttempts = 0

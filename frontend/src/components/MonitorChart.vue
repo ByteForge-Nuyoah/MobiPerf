@@ -481,257 +481,327 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="chart-container">
-    <div class="chart-header">
-      <h3>性能监控</h3>
-      <div style="font-size: 12px; color: #666; margin-left: 10px;">
-        <span v-if="state.isConnected" style="color: green;">● 连接正常</span>
-        <span v-else style="color: red;">● 连接断开</span> |
-        <span v-if="selectedSeriesName" style="color: #409eff; font-weight: bold;">👉 {{ selectedSeriesName }} |</span>
-        CPU: {{ state.dataBuffer.cpu.slice(-1)[0]?.[1] ?? '-' }}% |
-        FPS: {{ state.dataBuffer.fps.slice(-1)[0]?.[1] ?? '-' }} |
-        Stutter: {{ state.dataBuffer.stutter.slice(-1)[0]?.[1] ?? '-' }}% |
-        Update: {{ new Date(state.lastMetricUpdate).toLocaleTimeString() }}
+  <div class="monitor-container">
+    <div class="monitor-header">
+      <div class="header-left">
+        <h3 class="header-title">实时性能监控</h3>
+        <div class="status-bar">
+          <span class="status-item" :class="{ connected: state.isConnected }">
+            <span class="status-dot"></span>
+            {{ state.isConnected ? '连接正常' : '连接断开' }}
+          </span>
+          <span class="status-divider">|</span>
+          <span class="status-item" v-if="selectedSeriesName">
+            <span class="status-highlight">{{ selectedSeriesName }}</span>
+          </span>
+          <span class="status-divider" v-if="selectedSeriesName">|</span>
+          <span class="status-item">
+            CPU: <strong>{{ state.dataBuffer.cpu.slice(-1)[0]?.[1] ?? '-' }}</strong>%
+          </span>
+          <span class="status-divider">|</span>
+          <span class="status-item">
+            FPS: <strong>{{ state.dataBuffer.fps.slice(-1)[0]?.[1] ?? '-' }}</strong>
+          </span>
+          <span class="status-divider">|</span>
+          <span class="status-item">
+            Stutter: <strong>{{ state.dataBuffer.stutter.slice(-1)[0]?.[1] ?? '-' }}</strong>%
+          </span>
+        </div>
       </div>
-      <div class="btn-group">
-        <button @click="handleAddMarker" :disabled="!active" class="marker-btn">🚩 添加标记</button>
-        <button @click="exportData" :disabled="state.dataBuffer.cpu.length === 0" class="export-btn">导出 CSV</button>
-        <button @click="clearData" class="clear-btn">清空数据</button>
+      <div class="header-actions">
+        <button @click="handleAddMarker" :disabled="!active" class="action-btn marker-btn">
+          <span class="btn-icon">🚩</span>
+          <span class="btn-text">添加标记</span>
+        </button>
+        <button @click="exportData" :disabled="state.dataBuffer.cpu.length === 0" class="action-btn export-btn">
+          <span class="btn-icon">📥</span>
+          <span class="btn-text">导出 CSV</span>
+        </button>
+        <button @click="clearData" class="action-btn clear-btn">
+          <span class="btn-icon">🗑️</span>
+          <span class="btn-text">清空数据</span>
+        </button>
       </div>
     </div>
-    <div class="monitor-layout">
-      <div ref="chartRef" class="chart"></div>
+    
+    <div class="monitor-body">
+      <div ref="chartRef" class="chart-area"></div>
       <div class="screenshot-panel" v-if="currentScreenshot">
-        <h4>屏幕截图</h4>
-        <img :src="currentScreenshot" alt="设备截图" class="screenshot-img" />
+        <div class="panel-header">
+          <span class="panel-title">屏幕截图</span>
+        </div>
+        <div class="screenshot-content">
+          <img :src="currentScreenshot" alt="设备截图" class="screenshot-img" />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.chart-container {
+.monitor-container {
   width: 100%;
   height: 100%;
   background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
   position: relative;
   box-sizing: border-box;
-  animation: fadeIn 0.6s ease-out;
+  animation: fadeIn var(--transition-slow) ease-out;
 }
 
-.chart-header {
+.monitor-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
-  padding-bottom: var(--spacing-md);
-  border-bottom: 2px solid var(--border-light);
+  align-items: flex-start;
+  padding: var(--spacing-5) var(--spacing-6);
+  border-bottom: 1px solid var(--border-light);
+  gap: var(--spacing-4);
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
 }
 
-.btn-group {
+.header-left {
   display: flex;
-  gap: var(--spacing-sm);
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.header-title {
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger-500);
+}
+
+.status-item.connected .status-dot {
+  background: var(--success-500);
+}
+
+.status-divider {
+  color: var(--gray-300);
+}
+
+.status-highlight {
+  color: var(--primary-600);
+  font-weight: var(--font-medium);
+}
+
+.status-item strong {
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--spacing-2);
   flex-wrap: wrap;
 }
 
-.btn-group button {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   background: var(--bg-primary);
   cursor: pointer;
   font-size: var(--font-xs);
-  font-weight: 500;
+  font-weight: var(--font-medium);
   color: var(--text-secondary);
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
   white-space: nowrap;
 }
 
-.btn-group button:hover:not(:disabled) {
+.action-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 
-.btn-group button:disabled {
+.action-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-icon {
+  font-size: 14px;
 }
 
 .marker-btn {
-  background: linear-gradient(135deg, #ffecd2, #fcb69f) !important;
-  color: #c05621 !important;
-  border-color: #fbd38d !important;
+  background: var(--warning-50);
+  color: var(--warning-600);
+  border-color: var(--warning-500);
 }
 
 .marker-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #fcb69f, #ff8a5b) !important;
-}
-
-.clear-btn {
-  background: linear-gradient(135deg, #fed7d7, #feb2b2) !important;
-  color: #c53030 !important;
-  border-color: #fc8181 !important;
-}
-
-.clear-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #feb2b2, #fc8181) !important;
+  background: var(--warning-500);
+  color: white;
 }
 
 .export-btn {
-  background: linear-gradient(135deg, #bee3f8, #90cdf4) !important;
-  color: #2b6cb0 !important;
-  border-color: #63b3ed !important;
+  background: var(--primary-50);
+  color: var(--primary-600);
+  border-color: var(--primary-500);
 }
 
 .export-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #90cdf4, #63b3ed) !important;
+  background: var(--primary-500);
+  color: white;
 }
 
-.monitor-layout {
+.clear-btn {
+  background: var(--danger-50);
+  color: var(--danger-600);
+  border-color: var(--danger-500);
+}
+
+.clear-btn:hover:not(:disabled) {
+  background: var(--danger-500);
+  color: white;
+}
+
+.monitor-body {
   display: flex;
   flex: 1;
   min-height: 0;
   width: 100%;
-  gap: var(--spacing-md);
 }
 
-.chart {
+.chart-area {
   flex: 1;
   height: 100%;
   min-height: 400px;
   min-width: 0;
+  padding: var(--spacing-4);
 }
 
 .screenshot-panel {
-  width: 200px;
+  width: 220px;
   display: flex;
   flex-direction: column;
-  border-left: 2px solid var(--border-light);
-  padding-left: var(--spacing-md);
-  animation: slideIn 0.3s ease-out;
+  border-left: 1px solid var(--border-light);
+  background: var(--gray-50);
+  animation: slideIn var(--transition-base) ease-out;
 }
 
-.screenshot-panel h4 {
-  margin: 0 0 var(--spacing-sm) 0;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: center;
-  padding-bottom: var(--spacing-xs);
+.panel-header {
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: 1px solid var(--border-light);
 }
 
-.screenshot-list {
+.panel-title {
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.screenshot-content {
   flex: 1;
-  overflow-y: auto;
+  padding: var(--spacing-3);
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+  align-items: flex-start;
+  justify-content: center;
 }
 
-.screenshot-item {
-  position: relative;
+.screenshot-img {
+  width: 100%;
+  height: auto;
   border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.screenshot-item:hover {
-  transform: scale(1.05);
   box-shadow: var(--shadow-md);
 }
 
-.screenshot-item img {
-  width: 100%;
-  height: auto;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-}
-
-.screenshot-time {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-  color: white;
-  font-size: var(--font-xs);
-  padding: var(--spacing-sm);
-  text-align: center;
-}
-
 @media (max-width: 1024px) {
-  .chart-container {
-    padding: var(--spacing-md);
+  .monitor-header {
+    padding: var(--spacing-4);
   }
   
   .screenshot-panel {
-    width: 150px;
+    width: 180px;
   }
 }
 
 @media (max-width: 768px) {
-  .chart-container {
-    padding: var(--spacing-sm);
-  }
-  
-  .chart-header {
+  .monitor-header {
+    padding: var(--spacing-3);
     flex-direction: column;
     align-items: stretch;
   }
   
-  .btn-group {
-    justify-content: center;
+  .header-actions {
+    justify-content: flex-end;
   }
   
-  .monitor-layout {
+  .monitor-body {
     flex-direction: column;
+  }
+  
+  .chart-area {
+    min-height: 300px;
+    padding: var(--spacing-3);
   }
   
   .screenshot-panel {
     width: 100%;
     border-left: none;
-    border-top: 2px solid var(--border-light);
-    padding-left: 0;
-    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-light);
     max-height: 200px;
   }
   
-  .screenshot-list {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-  
-  .screenshot-item {
-    min-width: 120px;
+  .screenshot-content {
+    padding: var(--spacing-2);
   }
 }
 
 @media (max-width: 480px) {
-  .btn-group button {
-    padding: 4px var(--spacing-sm);
-    font-size: 11px;
+  .action-btn {
+    padding: var(--spacing-2) var(--spacing-3);
   }
   
-  .screenshot-panel {
-    max-height: 150px;
+  .btn-text {
+    display: none;
+  }
+  
+  .btn-icon {
+    font-size: 16px;
+  }
+  
+  .status-bar {
+    flex-wrap: wrap;
+    gap: var(--spacing-1);
+  }
+  
+  .status-divider {
+    display: none;
   }
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -742,7 +812,7 @@ onUnmounted(() => {
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateX(16px);
   }
   to {
     opacity: 1;

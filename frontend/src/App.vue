@@ -148,299 +148,334 @@ watch(() => monitorState.currentPackage, (pkg) => {
 </script>
 
 <template>
-  <div class="container">
+  <div class="app-container">
     <AuthForm v-if="!authState.isAuthenticated" />
     
-    <div v-else>
-      <header>
-        <div class="header-top">
-          <h1>
-            <span class="logo-icon">📊</span>
-            MobiPerf
-          </h1>
-          <div class="header-right">
-            <nav class="nav-tabs">
-              <div 
-                class="tab-item" 
-                :class="{ active: currentTab === 'monitor' }"
-                @click="currentTab = 'monitor'"
-              >
-                <span class="tab-icon">📈</span>
-                <span class="tab-text">监控</span>
+    <div v-else class="app-layout">
+      <header class="app-header">
+        <div class="header-content">
+          <div class="header-top">
+            <div class="brand">
+              <div class="brand-icon">📊</div>
+              <div class="brand-text">
+                <span class="brand-name">MobiPerf</span>
+                <span class="brand-tagline">移动性能监控平台</span>
               </div>
-              <div 
-                class="tab-item" 
-                :class="{ active: currentTab === 'multi' }"
-                @click="currentTab = 'multi'"
-              >
-                <span class="tab-icon">📱</span>
-                <span class="tab-text">多设备</span>
-              </div>
-              <div 
-                class="tab-item" 
-                :class="{ active: currentTab === 'analysis' }"
-                @click="currentTab = 'analysis'"
-              >
-                <span class="tab-icon">📊</span>
-                <span class="tab-text">分析</span>
-              </div>
-              <div 
-                class="tab-item" 
-                :class="{ active: currentTab === 'history' }"
-                @click="currentTab = 'history'"
-              >
-                <span class="tab-icon">📁</span>
-                <span class="tab-text">历史</span>
-              </div>
-              <div 
-                class="tab-item" 
-                :class="{ active: currentTab === 'logs' }"
-                @click="currentTab = 'logs'"
-              >
-                <span class="tab-icon">📝</span>
-                <span class="tab-text">日志</span>
-              </div>
-            </nav>
-            <div class="user-menu">
-              <div class="user-avatar">
-                {{ authState.user?.username?.charAt(0).toUpperCase() || 'U' }}
-              </div>
-              <div class="user-info">
-                <span class="user-name">{{ authState.user?.username }}</span>
-                <span class="user-role">{{ authState.user?.role || 'developer' }}</span>
-              </div>
-              <button @click="handleLogout" class="logout-btn" title="退出登录">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-              </button>
             </div>
-            <NotificationCenter />
+            <div class="header-right">
+              <nav class="nav-tabs">
+                <div 
+                  class="tab-item" 
+                  :class="{ active: currentTab === 'monitor' }"
+                  @click="currentTab = 'monitor'"
+                >
+                  <span class="tab-icon">📈</span>
+                  <span class="tab-text">监控</span>
+                </div>
+                <div 
+                  class="tab-item" 
+                  :class="{ active: currentTab === 'multi' }"
+                  @click="currentTab = 'multi'"
+                >
+                  <span class="tab-icon">📱</span>
+                  <span class="tab-text">多设备</span>
+                </div>
+                <div 
+                  class="tab-item" 
+                  :class="{ active: currentTab === 'analysis' }"
+                  @click="currentTab = 'analysis'"
+                >
+                  <span class="tab-icon">📊</span>
+                  <span class="tab-text">分析</span>
+                </div>
+                <div 
+                  class="tab-item" 
+                  :class="{ active: currentTab === 'history' }"
+                  @click="currentTab = 'history'"
+                >
+                  <span class="tab-icon">📁</span>
+                  <span class="tab-text">历史</span>
+                </div>
+                <div 
+                  class="tab-item" 
+                  :class="{ active: currentTab === 'logs' }"
+                  @click="currentTab = 'logs'"
+                >
+                  <span class="tab-icon">📝</span>
+                  <span class="tab-text">日志</span>
+                </div>
+              </nav>
+              <div class="user-menu">
+                <div class="user-avatar">
+                  {{ authState.user?.username?.charAt(0).toUpperCase() || 'U' }}
+                </div>
+                <div class="user-info">
+                  <span class="user-name">{{ authState.user?.username }}</span>
+                  <span class="user-role">{{ authState.user?.role || 'developer' }}</span>
+                </div>
+                <button @click="handleLogout" class="logout-btn" title="退出登录">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+              <NotificationCenter />
+            </div>
+          </div>
+        
+          <div class="control-bar" v-if="currentTab === 'monitor'">
+            <select v-model="selectedSerial" class="device-select">
+              <option v-for="d in devices" :key="d.serial" :value="d.serial">
+                {{ d.model }} ({{ d.platform }})
+              </option>
+            </select>
+            
+            <div class="input-wrapper">
+              <input 
+                v-model="targetPackage" 
+                type="text"
+                placeholder="应用包名 / Bundle ID (可选择或输入)" 
+                class="pkg-input"
+                @focus="showAppDropdown = true"
+                @blur="handleBlur"
+              />
+              <ul v-if="showAppDropdown && filteredApps.length" class="dropdown-list">
+                <li 
+                  v-for="app in filteredApps" 
+                  :key="app.package" 
+                  @click="selectApp(app)"
+                >
+                  {{ app.name }} <span class="pkg-sub">{{ app.package }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <button @click="fetchDevices" class="btn-refresh">刷新设备</button>
+            <button 
+              @click="toggleMonitor" 
+              :class="['btn-start', { 'btn-stop': isMonitoring }]" 
+              :disabled="!selectedSerial && !isMonitoring"
+            >
+              {{ isMonitoring ? '停止测试' : '开始测试' }}
+            </button>
           </div>
         </div>
-      
-      <div class="controls" v-if="currentTab === 'monitor'">
-        <select v-model="selectedSerial">
-          <option v-for="d in devices" :key="d.serial" :value="d.serial">
-            {{ d.model }} ({{ d.platform }})
-          </option>
-        </select>
-        
-        <div class="input-wrapper">
-          <input 
-            v-model="targetPackage" 
-            type="text"
-            placeholder="应用包名 / Bundle ID (可选择或输入)" 
-            class="pkg-input"
-            @focus="showAppDropdown = true"
-            @blur="handleBlur"
+      </header>
+
+      <main class="app-main">
+        <keep-alive>
+          <MonitorChart 
+            v-if="currentTab === 'monitor'"
+            :serial="selectedSerial" 
+            :active="isMonitoring" 
+            :target="targetPackage"
+            class="main-content"
           />
-          <ul v-if="showAppDropdown && filteredApps.length" class="dropdown-list">
-            <li 
-              v-for="app in filteredApps" 
-              :key="app.package" 
-              @click="selectApp(app)"
-            >
-              {{ app.name }} <span class="pkg-sub">{{ app.package }}</span>
-            </li>
-          </ul>
+          <MultiDeviceMonitor
+            v-else-if="currentTab === 'multi'"
+            class="main-content"
+          />
+          <PerformanceAnalysis
+            v-else-if="currentTab === 'performance'"
+            class="main-content"
+          />
+          <LogViewer
+            v-else-if="currentTab === 'logs'"
+            :serial="selectedSerial"
+            class="main-content"
+          />
+          <AnalysisReport 
+            v-else-if="currentTab === 'analysis'"
+            class="main-content"
+          />
+          <HistoryView
+            v-else-if="currentTab === 'history'"
+            class="main-content"
+          />
+        </keep-alive>
+        
+        <div v-if="currentTab === 'monitor' && !selectedSerial" class="empty-state">
+          <div class="empty-icon">📱</div>
+          <div class="empty-title">请连接设备</div>
+          <div class="empty-desc">连接 USB 设备并开启调试模式后，即可开始性能监控测试</div>
         </div>
-
-        <button @click="fetchDevices">刷新设备</button>
-        <button @click="toggleMonitor" :class="{ stop: isMonitoring }" :disabled="!selectedSerial && !isMonitoring">
-          {{ isMonitoring ? '停止测试' : '开始测试' }}
-        </button>
-      </div>
-    </header>
-
-    <main>
-      <keep-alive>
-        <MonitorChart 
-          v-if="currentTab === 'monitor'"
-          :serial="selectedSerial" 
-          :active="isMonitoring" 
-          :target="targetPackage"
-          class="main-content"
-        />
-        <MultiDeviceMonitor
-          v-else-if="currentTab === 'multi'"
-          class="main-content"
-        />
-        <PerformanceAnalysis
-          v-else-if="currentTab === 'performance'"
-          class="main-content"
-        />
-        <LogViewer
-          v-else-if="currentTab === 'logs'"
-          :serial="selectedSerial"
-          class="main-content"
-        />
-        <AnalysisReport 
-          v-else-if="currentTab === 'analysis'"
-          class="main-content"
-        />
-        <HistoryView
-          v-else-if="currentTab === 'history'"
-          class="main-content"
-        />
-      </keep-alive>
-      
-      <div v-if="currentTab === 'monitor' && !selectedSerial" class="empty-state">
-        请连接 USB 设备并开启调试模式。
-      </div>
-    </main>
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
-.container {
+.app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: var(--spacing-lg);
-  gap: var(--spacing-lg);
+  background: var(--bg-app);
 }
 
-header {
-  background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  padding: var(--spacing-lg);
-  animation: fadeIn 0.5s ease-out;
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.header-content {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--spacing-4) var(--spacing-6);
 }
 
 .header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-lg);
-  flex-wrap: wrap;
+  gap: var(--spacing-6);
 }
 
-h1 {
-  font-size: var(--font-2xl);
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+  border-radius: var(--radius-lg);
+  font-size: 20px;
+  box-shadow: var(--shadow-md);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-name {
+  font-size: var(--font-xl);
+  font-weight: var(--font-bold);
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
+  letter-spacing: -0.02em;
 }
 
-.logo-icon {
-  font-size: 1.5em;
-  -webkit-text-fill-color: initial;
+.brand-tagline {
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--font-normal);
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
-  flex-wrap: wrap;
+  gap: var(--spacing-4);
 }
 
 .nav-tabs {
   display: flex;
-  background: var(--bg-tertiary);
+  background: var(--gray-100);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-xs);
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
+  padding: var(--spacing-1);
+  gap: var(--spacing-1);
 }
 
 .tab-item {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-2) var(--spacing-4);
   cursor: pointer;
   border-radius: var(--radius-lg);
   font-size: var(--font-sm);
-  font-weight: 500;
+  font-weight: var(--font-medium);
   color: var(--text-secondary);
   transition: all var(--transition-base);
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-2);
+  border: none;
+  background: transparent;
 }
 
 .tab-icon {
-  font-size: 1.1em;
-}
-
-.tab-text {
-  font-size: var(--font-sm);
+  font-size: 16px;
 }
 
 .tab-item:hover {
-  color: var(--primary-color);
+  color: var(--primary-600);
   background: var(--bg-primary);
 }
 
 .tab-item.active {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-  color: white;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  background: var(--bg-primary);
+  color: var(--primary-600);
+  box-shadow: var(--shadow-sm);
 }
 
 .user-menu {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xs);
-  background: var(--bg-tertiary);
+  gap: var(--spacing-3);
+  padding: var(--spacing-2);
+  padding-right: var(--spacing-3);
+  background: var(--gray-50);
   border-radius: var(--radius-xl);
-  padding-right: var(--spacing-sm);
+  border: 1px solid var(--border-light);
 }
 
 .user-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--primary-500), var(--accent-500));
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: var(--font-md);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-base);
   flex-shrink: 0;
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 60px;
+  gap: 1px;
+  min-width: 70px;
 }
 
 .user-name {
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 .user-role {
   font-size: var(--font-xs);
   color: var(--text-tertiary);
-  line-height: 1.2;
+  line-height: 1.3;
   text-transform: capitalize;
 }
 
 .logout-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: 50%;
-  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all var(--transition-base);
   display: flex;
@@ -449,86 +484,68 @@ h1 {
 }
 
 .logout-btn:hover {
-  background: linear-gradient(135deg, var(--danger-color), #e53e3e);
-  color: white;
-  transform: scale(1.1);
+  background: var(--danger-50);
+  color: var(--danger-500);
 }
 
-.logout-btn:active {
-  transform: scale(0.95);
-}
-
-.controls {
+.control-bar {
+  margin-top: var(--spacing-4);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--border-light);
   display: flex;
-  gap: var(--spacing-md);
+  gap: var(--spacing-3);
   align-items: center;
   flex-wrap: wrap;
-  margin-top: var(--spacing-md);
-  padding-top: var(--spacing-md);
-  border-top: 2px solid var(--border-light);
+}
+
+.device-select {
+  min-width: 200px;
+  max-width: 280px;
 }
 
 .input-wrapper {
   position: relative;
   flex: 1;
-  min-width: 200px;
-  max-width: 400px;
+  min-width: 240px;
+  max-width: 420px;
 }
 
 .pkg-input {
   width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: var(--font-sm);
-  transition: all var(--transition-fast);
-}
-
-.pkg-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.pkg-input::placeholder {
-  color: var(--text-tertiary);
 }
 
 .dropdown-list {
   position: absolute;
-  top: calc(100% + var(--spacing-xs));
+  top: calc(100% + var(--spacing-2));
   left: 0;
   width: 100%;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
   background: var(--bg-primary);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  padding: var(--spacing-xs);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--spacing-1);
   list-style: none;
   z-index: var(--z-dropdown);
-  animation: slideIn 0.2s ease-out;
+  animation: slideUp var(--transition-base) ease-out;
 }
 
 .dropdown-list li {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-3) var(--spacing-4);
   cursor: pointer;
   font-size: var(--font-sm);
   color: var(--text-primary);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   transition: all var(--transition-fast);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-1);
 }
 
 .dropdown-list li:hover {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-  color: white;
-  transform: translateX(4px);
+  background: var(--primary-50);
+  color: var(--primary-700);
 }
 
 .pkg-sub {
@@ -537,82 +554,60 @@ h1 {
 }
 
 .dropdown-list li:hover .pkg-sub {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--primary-500);
 }
 
-select {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
+.btn-refresh {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-size: var(--font-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  min-width: 180px;
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
 }
 
-select:hover {
-  border-color: var(--primary-color);
-}
-
-select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-button {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  transition: all var(--transition-base);
-  box-shadow: var(--shadow-md);
-  white-space: nowrap;
-}
-
-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-button:active {
-  transform: translateY(0);
-}
-
-button.stop {
-  background: linear-gradient(135deg, var(--danger-color), #e53e3e);
-}
-
-button.stop:hover {
-  background: linear-gradient(135deg, #e53e3e, #c53030);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-refresh:hover {
+  background: var(--gray-50);
+  border-color: var(--border-dark);
   transform: none;
 }
 
-main {
+.btn-start {
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+  box-shadow: var(--shadow-md);
+  min-width: 100px;
+}
+
+.btn-start:hover {
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
+}
+
+.btn-stop:hover {
+  background: linear-gradient(135deg, var(--danger-600), #b91c1c);
+}
+
+.app-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 500px;
+  padding: var(--spacing-6);
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .main-content {
   flex: 1;
   background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-light);
   overflow: hidden;
-  animation: fadeIn 0.6s ease-out;
+  animation: fadeIn var(--transition-slow) ease-out;
   display: flex;
   flex-direction: column;
 }
@@ -622,34 +617,53 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  min-height: 300px;
+  flex: 1;
+  min-height: 400px;
   color: var(--text-tertiary);
   font-size: var(--font-lg);
-  gap: var(--spacing-md);
-  padding: var(--spacing-xl);
+  gap: var(--spacing-4);
+  padding: var(--spacing-8);
   text-align: center;
 }
 
-.empty-state::before {
-  content: '📱';
-  font-size: 64px;
-  opacity: 0.5;
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-100);
+  border-radius: var(--radius-2xl);
+  font-size: 36px;
+  margin-bottom: var(--spacing-2);
+}
+
+.empty-title {
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.empty-desc {
+  font-size: var(--font-base);
+  color: var(--text-tertiary);
+  max-width: 320px;
+  line-height: var(--leading-relaxed);
 }
 
 @media (max-width: 1024px) {
-  .container {
-    padding: var(--spacing-md);
-    gap: var(--spacing-md);
+  .app-main {
+    padding: var(--spacing-4);
   }
   
-  header {
-    padding: var(--spacing-md);
+  .header-content {
+    padding: var(--spacing-3) var(--spacing-4);
   }
   
   .header-top {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--spacing-4);
   }
   
   .header-right {
@@ -658,86 +672,110 @@ main {
   }
   
   .nav-tabs {
-    width: 100%;
+    flex: 1;
     justify-content: center;
   }
   
-  .controls {
+  .control-bar {
     flex-direction: column;
     align-items: stretch;
+  }
+  
+  .device-select {
+    max-width: 100%;
   }
   
   .input-wrapper {
     max-width: 100%;
   }
   
-  select {
-    width: 100%;
-  }
-  
-  button {
-    width: 100%;
+  .main-content {
+    border-radius: var(--radius-xl);
   }
 }
 
 @media (max-width: 768px) {
-  .container {
-    padding: var(--spacing-sm);
-    gap: var(--spacing-sm);
+  .app-main {
+    padding: var(--spacing-2);
   }
   
-  header {
-    padding: var(--spacing-sm);
+  .header-content {
+    padding: var(--spacing-2) var(--spacing-3);
   }
   
-  h1 {
-    font-size: var(--font-xl);
+  .brand-name {
+    font-size: var(--font-lg);
   }
   
   .nav-tabs {
-    gap: 4px;
-    padding: 4px;
+    gap: 2px;
+    padding: 2px;
   }
   
   .tab-item {
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: var(--spacing-2) var(--spacing-3);
     font-size: var(--font-xs);
   }
   
-  .controls {
-    gap: var(--spacing-sm);
+  .tab-icon {
+    font-size: 14px;
   }
   
-  select, .pkg-input {
-    font-size: var(--font-xs);
-    padding: 6px var(--spacing-sm);
+  .user-info {
+    display: none;
   }
   
-  button {
-    padding: 6px var(--spacing-sm);
-    font-size: var(--font-xs);
+  .control-bar {
+    gap: var(--spacing-2);
+  }
+  
+  .main-content {
+    border-radius: var(--radius-lg);
   }
 }
 
 @media (max-width: 480px) {
+  .app-main {
+    padding: var(--spacing-1);
+  }
+  
+  .header-content {
+    padding: var(--spacing-2);
+  }
+  
   .header-right {
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-3);
   }
   
   .nav-tabs {
-    flex-direction: column;
+    width: 100%;
+    justify-content: space-between;
   }
   
   .tab-item {
-    text-align: center;
+    flex: 1;
+    justify-content: center;
+    padding: var(--spacing-2);
+  }
+  
+  .tab-text {
+    display: none;
+  }
+  
+  .tab-icon {
+    font-size: 18px;
+  }
+  
+  .main-content {
+    border-radius: var(--radius-md);
   }
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -745,10 +783,10 @@ main {
   }
 }
 
-@keyframes slideIn {
+@keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;

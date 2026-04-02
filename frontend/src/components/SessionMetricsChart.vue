@@ -22,27 +22,39 @@
             <div class="checkbox-group">
               <label class="checkbox-item">
                 <input type="checkbox" v-model="visibleSeries.cpu" />
-                <span>CPU</span>
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" v-model="visibleSeries.memory" />
-                <span>内存</span>
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" v-model="visibleSeries.fps" />
-                <span>FPS</span>
+                <span>CPU(%)</span>
               </label>
               <label class="checkbox-item">
                 <input type="checkbox" v-model="visibleSeries.gpu" />
-                <span>GPU</span>
+                <span>GPU(%)</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" v-model="visibleSeries.fps" />
+                <span>帧率(FPS)</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" v-model="visibleSeries.jank" />
+                <span>卡顿(Jank)</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" v-model="visibleSeries.stutter" />
+                <span>卡顿率(Stutter%)</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" v-model="visibleSeries.memory" />
+                <span>内存(MB)</span>
               </label>
               <label class="checkbox-item">
                 <input type="checkbox" v-model="visibleSeries.temp" />
-                <span>温度</span>
+                <span>电池温度(℃)</span>
               </label>
               <label class="checkbox-item">
-                <input type="checkbox" v-model="visibleSeries.network" />
-                <span>网络</span>
+                <input type="checkbox" v-model="visibleSeries.networkRx" />
+                <span>网络下行(KB/s)</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" v-model="visibleSeries.networkTx" />
+                <span>网络上行(KB/s)</span>
               </label>
             </div>
           </div>
@@ -54,35 +66,59 @@
 
         <div class="metrics-summary">
           <div class="summary-card" v-if="summary.cpu">
-            <div class="summary-title">CPU</div>
+            <div class="summary-title">CPU(%)</div>
             <div class="summary-stats">
               <span>平均: {{ summary.cpu.avg.toFixed(1) }}%</span>
               <span>最大: {{ summary.cpu.max.toFixed(1) }}%</span>
               <span>最小: {{ summary.cpu.min.toFixed(1) }}%</span>
             </div>
           </div>
-          <div class="summary-card" v-if="summary.memory">
-            <div class="summary-title">内存</div>
+          <div class="summary-card" v-if="summary.gpu">
+            <div class="summary-title">GPU(%)</div>
             <div class="summary-stats">
-              <span>平均: {{ summary.memory.avg.toFixed(1) }}MB</span>
-              <span>最大: {{ summary.memory.max.toFixed(1) }}MB</span>
-              <span>最小: {{ summary.memory.min.toFixed(1) }}MB</span>
+              <span>平均: {{ summary.gpu.avg.toFixed(1) }}%</span>
+              <span>最大: {{ summary.gpu.max.toFixed(1) }}%</span>
+              <span>最小: {{ summary.gpu.min.toFixed(1) }}%</span>
             </div>
           </div>
           <div class="summary-card" v-if="summary.fps">
-            <div class="summary-title">FPS</div>
+            <div class="summary-title">帧率(FPS)</div>
             <div class="summary-stats">
               <span>平均: {{ summary.fps.avg.toFixed(1) }}</span>
               <span>最大: {{ summary.fps.max }}</span>
               <span>最小: {{ summary.fps.min }}</span>
             </div>
           </div>
-          <div class="summary-card" v-if="summary.temp">
-            <div class="summary-title">温度</div>
+          <div class="summary-card" v-if="summary.jank">
+            <div class="summary-title">卡顿(Jank)</div>
             <div class="summary-stats">
-              <span>平均: {{ summary.temp.avg.toFixed(1) }}°C</span>
-              <span>最大: {{ summary.temp.max.toFixed(1) }}°C</span>
-              <span>最小: {{ summary.temp.min.toFixed(1) }}°C</span>
+              <span>平均: {{ summary.jank.avg.toFixed(2) }}</span>
+              <span>最大: {{ summary.jank.max }}</span>
+              <span>最小: {{ summary.jank.min }}</span>
+            </div>
+          </div>
+          <div class="summary-card" v-if="summary.stutter">
+            <div class="summary-title">卡顿率(Stutter%)</div>
+            <div class="summary-stats">
+              <span>平均: {{ summary.stutter.avg.toFixed(2) }}%</span>
+              <span>最大: {{ summary.stutter.max.toFixed(2) }}%</span>
+              <span>最小: {{ summary.stutter.min.toFixed(2) }}%</span>
+            </div>
+          </div>
+          <div class="summary-card" v-if="summary.memory">
+            <div class="summary-title">内存(MB)</div>
+            <div class="summary-stats">
+              <span>平均: {{ summary.memory.avg.toFixed(1) }}MB</span>
+              <span>最大: {{ summary.memory.max.toFixed(1) }}MB</span>
+              <span>最小: {{ summary.memory.min.toFixed(1) }}MB</span>
+            </div>
+          </div>
+          <div class="summary-card" v-if="summary.temp">
+            <div class="summary-title">电池温度(℃)</div>
+            <div class="summary-stats">
+              <span>平均: {{ summary.temp.avg.toFixed(1) }}℃</span>
+              <span>最大: {{ summary.temp.max.toFixed(1) }}℃</span>
+              <span>最小: {{ summary.temp.min.toFixed(1) }}℃</span>
             </div>
           </div>
         </div>
@@ -114,18 +150,23 @@ let chartInstance = null
 
 const visibleSeries = ref({
   cpu: true,
-  memory: true,
+  gpu: true,
   fps: true,
-  gpu: false,
+  jank: false,
+  stutter: false,
+  memory: true,
   temp: false,
-  network: false
+  networkRx: false,
+  networkTx: false
 })
 
 const summary = ref({
   cpu: null,
-  memory: null,
-  fps: null,
   gpu: null,
+  fps: null,
+  jank: null,
+  stutter: null,
+  memory: null,
   temp: null
 })
 
@@ -162,9 +203,11 @@ const calculateSummary = () => {
   if (data.length === 0) return
 
   const cpuValues = data.map(m => m.cpu_usage).filter(v => v != null)
+  const gpuValues = data.map(m => m.gpu_usage).filter(v => v != null)
   const memValues = data.map(m => m.memory_usage).filter(v => v != null)
   const fpsValues = data.map(m => m.fps).filter(v => v != null)
-  const gpuValues = data.map(m => m.gpu_usage).filter(v => v != null)
+  const jankValues = data.map(m => m.jank_count).filter(v => v != null)
+  const stutterValues = data.map(m => m.stutter_rate).filter(v => v != null)
   const tempValues = data.map(m => m.battery_temp).filter(v => v != null)
 
   if (cpuValues.length > 0) {
@@ -174,11 +217,11 @@ const calculateSummary = () => {
       min: Math.min(...cpuValues)
     }
   }
-  if (memValues.length > 0) {
-    summary.value.memory = {
-      avg: memValues.reduce((a, b) => a + b, 0) / memValues.length,
-      max: Math.max(...memValues),
-      min: Math.min(...memValues)
+  if (gpuValues.length > 0) {
+    summary.value.gpu = {
+      avg: gpuValues.reduce((a, b) => a + b, 0) / gpuValues.length,
+      max: Math.max(...gpuValues),
+      min: Math.min(...gpuValues)
     }
   }
   if (fpsValues.length > 0) {
@@ -188,11 +231,25 @@ const calculateSummary = () => {
       min: Math.min(...fpsValues)
     }
   }
-  if (gpuValues.length > 0) {
-    summary.value.gpu = {
-      avg: gpuValues.reduce((a, b) => a + b, 0) / gpuValues.length,
-      max: Math.max(...gpuValues),
-      min: Math.min(...gpuValues)
+  if (jankValues.length > 0) {
+    summary.value.jank = {
+      avg: jankValues.reduce((a, b) => a + b, 0) / jankValues.length,
+      max: Math.max(...jankValues),
+      min: Math.min(...jankValues)
+    }
+  }
+  if (stutterValues.length > 0) {
+    summary.value.stutter = {
+      avg: stutterValues.reduce((a, b) => a + b, 0) / stutterValues.length,
+      max: Math.max(...stutterValues),
+      min: Math.min(...stutterValues)
+    }
+  }
+  if (memValues.length > 0) {
+    summary.value.memory = {
+      avg: memValues.reduce((a, b) => a + b, 0) / memValues.length,
+      max: Math.max(...memValues),
+      min: Math.min(...memValues)
     }
   }
   if (tempValues.length > 0) {
@@ -227,6 +284,8 @@ const initChart = () => {
       name: 'CPU (%)',
       type: 'line',
       showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
       data: data.map(m => m.cpu_usage),
       yAxisIndex: 0
     })
@@ -239,27 +298,32 @@ const initChart = () => {
     })
   }
 
-  if (visibleSeries.value.memory) {
+  if (visibleSeries.value.gpu) {
     series.push({
-      name: '内存 (MB)',
+      name: 'GPU (%)',
       type: 'line',
       showSymbol: false,
-      data: data.map(m => m.memory_usage),
+      smooth: true,
+      lineStyle: { width: 2 },
+      data: data.map(m => m.gpu_usage),
       yAxisIndex: yAxis.length
     })
     yAxis.push({
       type: 'value',
-      name: '内存 (MB)',
+      name: 'GPU (%)',
       min: 0,
+      max: 100,
       position: 'right'
     })
   }
 
   if (visibleSeries.value.fps) {
     series.push({
-      name: 'FPS',
+      name: '帧率 (FPS)',
       type: 'line',
       showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
       data: data.map(m => m.fps),
       yAxisIndex: yAxis.length
     })
@@ -273,64 +337,122 @@ const initChart = () => {
     })
   }
 
-  if (visibleSeries.value.gpu) {
+  if (visibleSeries.value.jank) {
     series.push({
-      name: 'GPU (%)',
-      type: 'line',
-      showSymbol: false,
-      data: data.map(m => m.gpu_usage),
+      name: '卡顿 (Jank)',
+      type: 'bar',
+      barWidth: 4,
+      itemStyle: { color: '#e74c3c', opacity: 0.6 },
+      data: data.map(m => m.jank_count),
       yAxisIndex: yAxis.length
     })
     yAxis.push({
       type: 'value',
-      name: 'GPU (%)',
+      name: 'Jank',
       min: 0,
-      max: 100,
       position: 'right',
+      offset: yAxis.length > 1 ? 60 : 0
+    })
+  }
+
+  if (visibleSeries.value.stutter) {
+    series.push({
+      name: '卡顿率 (Stutter%)',
+      type: 'line',
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2, type: 'dashed' },
+      areaStyle: { opacity: 0.15 },
+      data: data.map(m => m.stutter_rate),
+      yAxisIndex: yAxis.length
+    })
+    yAxis.push({
+      type: 'value',
+      name: 'Stutter %',
+      min: 0,
+      max: 50,
+      position: 'right',
+      offset: yAxis.length > 1 ? 120 : 0
+    })
+  }
+
+  if (visibleSeries.value.memory) {
+    series.push({
+      name: '内存 (MB)',
+      type: 'line',
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
+      data: data.map(m => m.memory_usage),
+      yAxisIndex: yAxis.length
+    })
+    yAxis.push({
+      type: 'value',
+      name: '内存 (MB)',
+      min: 0,
+      position: 'left',
       offset: yAxis.length > 1 ? 60 : 0
     })
   }
 
   if (visibleSeries.value.temp) {
     series.push({
-      name: '温度 (°C)',
+      name: '电池温度 (℃)',
       type: 'line',
       showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
       data: data.map(m => m.battery_temp),
       yAxisIndex: yAxis.length
     })
     yAxis.push({
       type: 'value',
-      name: '温度 (°C)',
-      min: 0,
-      max: 60,
-      position: 'left',
+      name: '温度 (℃)',
+      min: 20,
+      max: 55,
+      position: 'right',
       offset: yAxis.length > 1 ? 120 : 0
     })
   }
 
-  if (visibleSeries.value.network) {
+  if (visibleSeries.value.networkRx) {
     series.push({
       name: '网络下行 (KB/s)',
       type: 'line',
       showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
       data: data.map(m => m.network_rx),
-      yAxisIndex: yAxis.length
-    })
-    series.push({
-      name: '网络上行 (KB/s)',
-      type: 'line',
-      showSymbol: false,
-      data: data.map(m => m.network_tx),
       yAxisIndex: yAxis.length
     })
     yAxis.push({
       type: 'value',
-      name: '网络 (KB/s)',
+      name: '网络下行 (KB/s)',
       min: 0,
-      position: 'right',
-      offset: yAxis.length > 1 ? 120 : 0
+      position: 'left',
+      offset: yAxis.length > 1 ? 180 : 0
     })
+  }
+
+  if (visibleSeries.value.networkTx) {
+    series.push({
+      name: '网络上行 (KB/s)',
+      type: 'line',
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 2 },
+      data: data.map(m => m.network_tx),
+      yAxisIndex: yAxis.length
+    })
+    if (!visibleSeries.value.networkRx) {
+      yAxis.push({
+        type: 'value',
+        name: '网络上行 (KB/s)',
+        min: 0,
+        position: 'right',
+        offset: yAxis.length > 1 ? 180 : 0
+      })
+    }
   }
 
   const option = {
@@ -524,7 +646,7 @@ onUnmounted(() => {
 
 .chart-container {
   width: 100%;
-  height: 500px;
+  height: 600px;
   margin-bottom: 20px;
 }
 
