@@ -187,6 +187,30 @@ app.add_middleware(
 # 存储活跃的采集器实例
 collectors: Dict[str, Union[AndroidCollector, IOSCollector]] = {}
 
+def get_device(serial: str):
+    """根据序列号获取设备对象
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        设备对象，如果未找到返回 None
+    """
+    try:
+        # Check if it's an iOS device
+        if len(serial) > 20 or "-" in serial:
+            return serial  # For iOS, just return the serial
+        
+        # For Android devices
+        for d in adb.device_list():
+            if d.serial == serial:
+                return d
+        
+        return None
+    except Exception as e:
+        logger.error(f"Failed to get device {serial}: {e}")
+        return None
+
 @app.get(
     "/api/devices",
     response_model=DeviceListResponse,
@@ -278,6 +302,326 @@ async def get_apps(
     
     await cache.set(cache_key, apps, cache_cfg.ttl)
     return {"apps": apps}
+
+@app.get(
+    "/api/current-app/{serial}",
+    summary="获取当前前台应用",
+    description="获取设备当前前台运行的应用包名",
+    tags=["设备管理"]
+)
+async def get_current_app(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """获取设备当前前台运行的应用
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        当前前台应用的包名
+    """
+    try:
+        if len(serial) > 20 or "-" in serial:
+            return {"package": None, "error": "iOS not supported"}
+        
+        device = get_device(serial)
+        if not device:
+            return {"package": None, "error": "Device not found"}
+        
+        collector = AndroidCollector(device)
+        package = collector._get_top_package()
+        
+        return {"package": package, "error": None}
+    except Exception as e:
+        logger.error(f"Failed to get current app: {e}")
+        return {"package": None, "error": str(e)}
+
+@app.post(
+    "/api/screenshot/{serial}",
+    summary="截取设备屏幕",
+    description="截取指定设备的当前屏幕并保存",
+    tags=["设备管理"]
+)
+async def take_screenshot(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """截取设备屏幕
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        截图文件的URL和保存路径
+    """
+    try:
+        device = get_device(serial)
+        if not device:
+            return {"success": False, "error": "Device not found"}
+        
+        timestamp = int(time.time() * 1000)
+        filename = f"{timestamp}.png"
+        screenshot_dir_serial = os.path.join(SCREENSHOT_DIR, serial)
+        os.makedirs(screenshot_dir_serial, exist_ok=True)
+        screenshot_path = os.path.join(screenshot_dir_serial, filename)
+        
+        if len(serial) > 20 or "-" in serial:
+            # iOS device
+            import subprocess
+            result = subprocess.run(
+                ['idevicescreenshot', '-u', serial, screenshot_path],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                logger.error(f"iOS screenshot failed: {result.stderr}")
+                return {"success": False, "error": result.stderr}
+        else:
+            # Android device
+            device.shell(f"screencap -p /sdcard/{filename}")
+            device.sync.pull(f"/sdcard/{filename}", screenshot_path)
+            device.shell(f"rm /sdcard/{filename}")
+        
+        screenshot_url = f"/screenshots/{serial}/{filename}"
+        
+        return {
+            "success": True,
+            "url": screenshot_url,
+            "filename": filename,
+            "timestamp": timestamp
+        }
+    except Exception as e:
+        logger.error(f"Failed to take screenshot: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get(
+    "/api/screenshots/{serial}",
+    summary="获取截图列表",
+    description="获取指定设备的所有截图",
+    tags=["设备管理"]
+)
+async def list_screenshots(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """获取设备的截图列表
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        截图文件列表，包含文件名、URL、大小和时间
+    """
+    screenshot_dir_serial = os.path.join(SCREENSHOT_DIR, serial)
+    if not os.path.exists(screenshot_dir_serial):
+        return {"screenshots": []}
+    
+    screenshots = []
+    try:
+        for f in os.listdir(screenshot_dir_serial):
+            if f.endswith(".png"):
+                fp = os.path.join(screenshot_dir_serial, f)
+                stat = os.stat(fp)
+                screenshots.append({
+                    "filename": f,
+                    "url": f"/screenshots/{serial}/{f}",
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat()
+                })
+        
+        screenshots.sort(key=lambda x: x['created_at'], reverse=True)
+        return {"screenshots": screenshots}
+    except Exception as e:
+        logger.error(f"Failed to list screenshots: {e}")
+        return {"screenshots": [], "error": str(e)}
+
+@app.delete(
+    "/api/screenshots/{serial}/{filename}",
+    summary="删除截图",
+    description="删除指定的截图文件",
+    tags=["设备管理"]
+)
+async def delete_screenshot(serial: str, filename: str, current_user: Dict = Depends(get_current_active_user)):
+    """删除截图文件
+    
+    Args:
+        serial: 设备序列号
+        filename: 截图文件名
+        
+    Returns:
+        删除结果
+    """
+    try:
+        screenshot_path = os.path.join(SCREENSHOT_DIR, serial, filename)
+        if os.path.exists(screenshot_path):
+            os.remove(screenshot_path)
+            return {"success": True, "message": "Screenshot deleted"}
+        else:
+            return {"success": False, "error": "Screenshot not found"}
+    except Exception as e:
+        logger.error(f"Failed to delete screenshot: {e}")
+        return {"success": False, "error": str(e)}
+
+# Screen recording state management
+recording_processes = {}
+
+@app.post(
+    "/api/screenrecord/start/{serial}",
+    summary="开始录屏",
+    description="开始录制设备屏幕",
+    tags=["设备管理"]
+)
+async def start_screenrecord(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """开始录屏
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        录屏开始状态
+    """
+    try:
+        if serial in recording_processes:
+            return {"success": False, "error": "Recording already in progress"}
+        
+        device = get_device(serial)
+        if not device:
+            return {"success": False, "error": "Device not found"}
+        
+        if len(serial) > 20 or "-" in serial:
+            return {"success": False, "error": "iOS screen recording not supported yet"}
+        
+        timestamp = int(time.time() * 1000)
+        filename = f"{timestamp}.mp4"
+        video_dir_serial = os.path.join(SCREENSHOT_DIR, serial, "videos")
+        os.makedirs(video_dir_serial, exist_ok=True)
+        video_path = os.path.join(video_dir_serial, filename)
+        
+        # Start screen recording on device
+        device.shell(f"screenrecord /sdcard/{filename} &")
+        
+        recording_processes[serial] = {
+            "filename": filename,
+            "start_time": timestamp,
+            "video_path": video_path
+        }
+        
+        return {
+            "success": True,
+            "message": "Recording started",
+            "filename": filename
+        }
+    except Exception as e:
+        logger.error(f"Failed to start screen recording: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post(
+    "/api/screenrecord/stop/{serial}",
+    summary="停止录屏",
+    description="停止录制设备屏幕并保存视频",
+    tags=["设备管理"]
+)
+async def stop_screenrecord(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """停止录屏
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        录屏文件URL和保存路径
+    """
+    try:
+        if serial not in recording_processes:
+            return {"success": False, "error": "No recording in progress"}
+        
+        recording = recording_processes[serial]
+        filename = recording["filename"]
+        video_path = recording["video_path"]
+        
+        device = get_device(serial)
+        if not device:
+            return {"success": False, "error": "Device not found"}
+        
+        # Stop recording by killing the process
+        device.shell("pkill -SIGINT screenrecord")
+        time.sleep(2)  # Wait for recording to finish
+        
+        # Pull the video file
+        device.sync.pull(f"/sdcard/{filename}", video_path)
+        device.shell(f"rm /sdcard/{filename}")
+        
+        del recording_processes[serial]
+        
+        video_url = f"/screenshots/{serial}/videos/{filename}"
+        
+        return {
+            "success": True,
+            "url": video_url,
+            "filename": filename,
+            "duration": int(time.time() * 1000) - recording["start_time"]
+        }
+    except Exception as e:
+        logger.error(f"Failed to stop screen recording: {e}")
+        if serial in recording_processes:
+            del recording_processes[serial]
+        return {"success": False, "error": str(e)}
+
+@app.get(
+    "/api/videos/{serial}",
+    summary="获取录屏列表",
+    description="获取指定设备的所有录屏文件",
+    tags=["设备管理"]
+)
+async def list_videos(serial: str, current_user: Dict = Depends(get_current_active_user)):
+    """获取设备的录屏列表
+    
+    Args:
+        serial: 设备序列号
+        
+    Returns:
+        录屏文件列表，包含文件名、URL、大小和时间
+    """
+    video_dir_serial = os.path.join(SCREENSHOT_DIR, serial, "videos")
+    if not os.path.exists(video_dir_serial):
+        return {"videos": []}
+    
+    videos = []
+    try:
+        for f in os.listdir(video_dir_serial):
+            if f.endswith(".mp4"):
+                fp = os.path.join(video_dir_serial, f)
+                stat = os.stat(fp)
+                videos.append({
+                    "filename": f,
+                    "url": f"/screenshots/{serial}/videos/{f}",
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat()
+                })
+        
+        videos.sort(key=lambda x: x['created_at'], reverse=True)
+        return {"videos": videos}
+    except Exception as e:
+        logger.error(f"Failed to list videos: {e}")
+        return {"videos": [], "error": str(e)}
+
+@app.delete(
+    "/api/videos/{serial}/{filename}",
+    summary="删除录屏",
+    description="删除指定的录屏文件",
+    tags=["设备管理"]
+)
+async def delete_video(serial: str, filename: str, current_user: Dict = Depends(get_current_active_user)):
+    """删除录屏文件
+    
+    Args:
+        serial: 设备序列号
+        filename: 录屏文件名
+        
+    Returns:
+        删除结果
+    """
+    try:
+        video_path = os.path.join(SCREENSHOT_DIR, serial, "videos", filename)
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            return {"success": True, "message": "Video deleted"}
+        else:
+            return {"success": False, "error": "Video not found"}
+    except Exception as e:
+        logger.error(f"Failed to delete video: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.get(
     "/api/records/{serial}",
@@ -409,6 +753,7 @@ async def delete_session(session_id: str):
 
 @app.websocket("/ws/monitor/{serial}")
 async def websocket_endpoint(websocket: WebSocket, serial: str):
+    logger.info(f"Accepting WebSocket connection for device: {serial}")
     await websocket.accept()
     
     platform = "android"
@@ -550,6 +895,8 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                     # 处理客户端指令
                     msg = task.result()
                     # 比如 {"type": "start", "target": "com.example"}
+                    logger.info(f"Received message: {msg}")
+                    
                     if msg.get("type") == "start":
                         target = msg.get("target")
                         collector.set_target(target)
@@ -591,6 +938,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                         except Exception as e:
                             logger.error(f"Failed to init recording: {e}")
                     elif msg.get("type") == "stop":
+                        logger.info(f"Received stop message, repository={repository is not None}, session_created={session_created}, session_id={session_id}")
                         collector.stop()
                         # 重置性能分析器
                         analyzer.reset()
@@ -600,6 +948,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                             try:
                                 end_time = datetime.now()
                                 duration = int((end_time - session_start_time).total_seconds()) if session_start_time else 0
+                                logger.info(f"Updating session {session_id}: end_time={end_time}, duration={duration}")
                                 await repository.update_test_session(session_id, {
                                     'end_time': end_time,
                                     'status': 'completed',
@@ -608,6 +957,8 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                                 logger.info(f"Updated database session: {session_id}, duration: {duration}s")
                             except Exception as e:
                                 logger.error(f"Failed to update database session: {e}")
+                        else:
+                            logger.warning(f"Cannot update session: repository={repository is not None}, session_created={session_created}")
                         
                         session_created = False
                         

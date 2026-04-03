@@ -9,7 +9,7 @@ from loguru import logger
 
 SECRET_KEY = "your-secret-key-change-this-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 24 * 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 security = HTTPBearer()

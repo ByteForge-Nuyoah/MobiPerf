@@ -346,7 +346,7 @@ class AndroidCollector:
             self._refresh_pids(package)
             
             if not self.current_pids:
-                # logger.warning(f"No PIDs found for package: {package}")
+                logger.warning(f"No PIDs found for package: {package}")
                 return 0.0
             
             pid_str = ",".join(self.current_pids)

@@ -167,7 +167,13 @@ export const useAuthStore = () => {
       return false
     }
     
-    return await fetchCurrentUser()
+    try {
+      return await fetchCurrentUser()
+    } catch (error) {
+      console.error('Check auth error:', error)
+      state.isAuthenticated = false
+      return false
+    }
   }
   
   const clearError = () => {

@@ -62,22 +62,28 @@ export const useMonitorStore = () => {
     const wsUrl = `${protocol}//${window.location.host}/ws/monitor/${serial}`
     
     console.log('Store: Connecting to WS:', wsUrl)
+    console.log('Store: Protocol:', protocol)
+    console.log('Store: Host:', window.location.host)
     state.isReconnecting = state.reconnectAttempts > 0
     
     try {
       ws = new WebSocket(wsUrl)
       
+      console.log('Store: WS created, readyState:', ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)')
+      
       ws.onopen = () => {
-        console.log('Store: WS Connected')
+        console.log('Store: WS Connected, readyState:', ws.readyState)
         state.isConnected = true
         state.isReconnecting = false
         state.reconnectAttempts = 0
         const msg = target ? { type: "start", target } : { type: "start" }
+        console.log('Store: Sending start message:', msg)
         ws.send(JSON.stringify(msg))
       }
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
+        console.log('Store: Received message type:', data.type, data.type === 'monitor' ? `cpu: ${data.cpu}, mem: ${data.memory}, fps: ${data.fps}` : '')
         
         if (data.type === 'screenshot') {
           state.screenshotBuffer.push({ time: data.timestamp, url: data.url })

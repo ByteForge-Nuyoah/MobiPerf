@@ -22,6 +22,10 @@ const isMonitoring = ref(false)
 const selectedDevice = ref(null)
 const currentTab = ref('monitor')
 const showAppDropdown = ref(false)
+const isInitializing = ref(true)
+const isRecording = ref(false)
+const screenshotLoading = ref(false)
+const lastScreenshot = ref(null)
 let pollTimer = null
 const { state: monitorState } = useMonitorStore()
 const { state: authState, checkAuth, logout } = useAuthStore()
@@ -100,14 +104,26 @@ const updateSelectedDevice = () => {
 }
 
 // Watch selection change
-watch(selectedSerial, () => {
+watch(selectedSerial, async () => {
   updateSelectedDevice()
   isMonitoring.value = false
   fetchApps()
+  
+  if (selectedSerial.value && selectedDevice.value?.platform === 'android') {
+    try {
+      const response = await axios.get(`/api/current-app/${selectedSerial.value}`)
+      if (response.data.package) {
+        targetPackage.value = response.data.package
+      }
+    } catch (error) {
+      console.error('Failed to get current app:', error)
+    }
+  }
 })
 
 onMounted(async () => {
   const isAuthenticated = await checkAuth()
+  isInitializing.value = false
   
   if (isAuthenticated) {
     fetchDevices()
@@ -139,6 +155,60 @@ const toggleMonitor = () => {
   isMonitoring.value = !isMonitoring.value
 }
 
+const takeScreenshot = async () => {
+  if (!selectedSerial.value) {
+    alert('请先选择设备')
+    return
+  }
+  
+  screenshotLoading.value = true
+  try {
+    const response = await axios.post(`/api/screenshot/${selectedSerial.value}`)
+    if (response.data.success) {
+      lastScreenshot.value = response.data
+      alert('截图成功！')
+    } else {
+      alert('截图失败：' + response.data.error)
+    }
+  } catch (error) {
+    console.error('Screenshot error:', error)
+    alert('截图失败：' + (error.response?.data?.error || error.message))
+  } finally {
+    screenshotLoading.value = false
+  }
+}
+
+const toggleRecording = async () => {
+  if (!selectedSerial.value) {
+    alert('请先选择设备')
+    return
+  }
+  
+  try {
+    if (!isRecording.value) {
+      const response = await axios.post(`/api/screenrecord/start/${selectedSerial.value}`)
+      if (response.data.success) {
+        isRecording.value = true
+        alert('开始录屏')
+      } else {
+        alert('开始录屏失败：' + response.data.error)
+      }
+    } else {
+      const response = await axios.post(`/api/screenrecord/stop/${selectedSerial.value}`)
+      if (response.data.success) {
+        isRecording.value = false
+        alert('录屏已保存')
+      } else {
+        alert('停止录屏失败：' + response.data.error)
+      }
+    }
+  } catch (error) {
+    console.error('Recording error:', error)
+    alert('录屏操作失败：' + (error.response?.data?.error || error.message))
+    isRecording.value = false
+  }
+}
+
 watch(() => monitorState.currentPackage, (pkg) => {
   if (!pkg) return
   if (isMonitoring.value && !targetPackage.value) {
@@ -149,7 +219,14 @@ watch(() => monitorState.currentPackage, (pkg) => {
 
 <template>
   <div class="app-container">
-    <AuthForm v-if="!authState.isAuthenticated" />
+    <div v-if="isInitializing" class="loading-screen">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">正在加载...</p>
+      </div>
+    </div>
+    
+    <AuthForm v-else-if="!authState.isAuthenticated" />
     
     <div v-else class="app-layout">
       <header class="app-header">
@@ -260,6 +337,20 @@ watch(() => monitorState.currentPackage, (pkg) => {
             >
               {{ isMonitoring ? '停止测试' : '开始测试' }}
             </button>
+            <button 
+              @click="takeScreenshot" 
+              class="btn-screenshot"
+              :disabled="!selectedSerial || screenshotLoading"
+            >
+              {{ screenshotLoading ? '截图中...' : '📷 截图' }}
+            </button>
+            <button 
+              @click="toggleRecording" 
+              :class="['btn-record', { 'btn-recording': isRecording }]"
+              :disabled="!selectedSerial"
+            >
+              {{ isRecording ? '⏹️ 停止录屏' : '🎬 开始录屏' }}
+            </button>
           </div>
         </div>
       </header>
@@ -312,6 +403,40 @@ watch(() => monitorState.currentPackage, (pkg) => {
   flex-direction: column;
   min-height: 100vh;
   background: var(--bg-app);
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+.loading-text {
+  color: white;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .app-header {
@@ -590,6 +715,54 @@ watch(() => monitorState.currentPackage, (pkg) => {
   background: linear-gradient(135deg, var(--danger-600), #b91c1c);
 }
 
+.btn-screenshot {
+  background: linear-gradient(135deg, var(--success-500), var(--success-600));
+  box-shadow: var(--shadow-md);
+  min-width: 100px;
+}
+
+.btn-screenshot:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--success-600), var(--success-700));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-screenshot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-record {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: var(--shadow-md);
+  min-width: 120px;
+}
+
+.btn-record:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-record:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-recording {
+  background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+}
+
 .app-main {
   flex: 1;
   display: flex;
@@ -688,19 +861,15 @@ watch(() => monitorState.currentPackage, (pkg) => {
   .input-wrapper {
     max-width: 100%;
   }
-  
-  .main-content {
-    border-radius: var(--radius-xl);
-  }
 }
 
 @media (max-width: 768px) {
   .app-main {
-    padding: var(--spacing-2);
+    padding: var(--spacing-3);
   }
   
   .header-content {
-    padding: var(--spacing-2) var(--spacing-3);
+    padding: var(--spacing-3);
   }
   
   .brand-name {
@@ -728,21 +897,9 @@ watch(() => monitorState.currentPackage, (pkg) => {
   .control-bar {
     gap: var(--spacing-2);
   }
-  
-  .main-content {
-    border-radius: var(--radius-lg);
-  }
 }
 
 @media (max-width: 480px) {
-  .app-main {
-    padding: var(--spacing-1);
-  }
-  
-  .header-content {
-    padding: var(--spacing-2);
-  }
-  
   .header-right {
     flex-direction: column;
     gap: var(--spacing-3);
@@ -765,10 +922,6 @@ watch(() => monitorState.currentPackage, (pkg) => {
   
   .tab-icon {
     font-size: 18px;
-  }
-  
-  .main-content {
-    border-radius: var(--radius-md);
   }
 }
 
