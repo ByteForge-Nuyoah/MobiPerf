@@ -137,11 +137,23 @@ class RedisCache:
         try:
             info = await self._client.info("memory")
             keys = await self._client.keys(f"{config.redis.prefix}*")
+            
+            key_details = []
+            for key in keys[:10]:
+                ttl = await self._client.ttl(key)
+                key_type = await self._client.type(key)
+                key_details.append({
+                    "key": key.replace(config.redis.prefix, ""),
+                    "ttl": ttl,
+                    "type": key_type
+                })
+            
             return {
                 "connected": True,
                 "total_keys": len(keys),
                 "used_memory": info.get("used_memory_human", "unknown"),
-                "max_memory": info.get("maxmemory_human", "unknown")
+                "max_memory": info.get("maxmemory_human", "unknown"),
+                "keys": key_details
             }
         except Exception as e:
             logger.error(f"Redis get_stats error: {e}")

@@ -223,7 +223,15 @@ async def refresh_token(request: RefreshTokenRequest):
         )
     
     user_id = payload.get("sub")
-    user = await collab_repo.get_user_by_id(int(user_id))
+    
+    if collab_repo.db.pool:
+        user = await collab_repo.get_user_by_id(int(user_id))
+    else:
+        user = None
+        for u in in_memory_users.values():
+            if u['id'] == int(user_id):
+                user = u
+                break
     
     if not user:
         raise HTTPException(

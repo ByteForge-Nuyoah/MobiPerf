@@ -102,9 +102,11 @@ const exportData = () => {
 let resizeObserver = null
 
 const initChart = () => {
+  console.log('MonitorChart: initChart called, chartInstance:', !!chartInstance, 'chartRef.value:', !!chartRef.value)
   if (chartInstance) {
     // Check if DOM is disconnected
     if (chartInstance.getDom() !== chartRef.value) {
+        console.log('MonitorChart: Disposing old chartInstance')
         chartInstance.dispose()
         chartInstance = null
         if (resizeObserver) {
@@ -113,14 +115,20 @@ const initChart = () => {
         }
     } else {
         // Resize just in case
+        console.log('MonitorChart: Resizing existing chartInstance')
         chartInstance.resize()
         return
     }
   }
   
-  if (!chartRef.value) return
+  if (!chartRef.value) {
+    console.warn('MonitorChart: chartRef.value is null, cannot init chart')
+    return
+  }
 
+  console.log('MonitorChart: Creating new chartInstance')
   chartInstance = echarts.init(chartRef.value)
+  console.log('MonitorChart: chartInstance created:', !!chartInstance)
   
   // Setup ResizeObserver for robust resizing
   resizeObserver = new ResizeObserver(() => {
@@ -187,10 +195,10 @@ const initChart = () => {
       }
     },
     legend: { 
-      data: ['CPU (%)', 'GPU (%)', '帧率 (FPS)', '卡顿 (Jank)', '卡顿率 (Stutter %)', '内存 (MB)', '电池温度 (°C)'],
+      data: ['CPU (%)', 'GPU (%)', '帧率 (FPS)', '卡顿 (Jank)', '卡顿率 (Stutter %)', '内存 (MB)', '电池温度 (°C)', '网络下行 (KB/s)', '网络上行 (KB/s)'],
       bottom: 0,
       top: 'auto',
-      type: 'scroll' 
+      type: 'scroll'
     },
     grid: { 
       left: '3%', 
@@ -286,6 +294,20 @@ const initChart = () => {
         labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
         emphasis: { focus: 'series' },
         data: [] 
+      },
+      { 
+        name: '网络下行 (KB/s)', type: 'line', showSymbol: false,
+        endLabel: { show: false, formatter: '{a}', color: 'inherit' },
+        labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+        emphasis: { focus: 'series' },
+        data: [] 
+      },
+      { 
+        name: '网络上行 (KB/s)', type: 'line', showSymbol: false,
+        endLabel: { show: false, formatter: '{a}', color: 'inherit' },
+        labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+        emphasis: { focus: 'series' },
+        data: [] 
       }
     ]
   }
@@ -293,7 +315,7 @@ const initChart = () => {
 
   const setActiveSeriesLabels = (activeName = '') => {
     const names = [
-      'CPU (%)','GPU (%)','帧率 (FPS)','卡顿 (Jank)','卡顿率 (Stutter %)','内存 (MB)','电池温度 (°C)'
+      'CPU (%)','GPU (%)','帧率 (FPS)','卡顿 (Jank)','卡顿率 (Stutter %)','内存 (MB)','电池温度 (°C)','网络下行 (KB/s)','网络上行 (KB/s)'
     ]
     chartInstance.setOption({
       series: names.map(n => {
@@ -343,6 +365,8 @@ const initChart = () => {
         setActiveSeriesLabels('')
     }
   })
+  
+  console.log('MonitorChart: Chart initialized with legend config')
 }
 
 // Watch markers to update chart immediately
@@ -389,8 +413,40 @@ const updateScreenshot = (time) => {
 
 // Watch lastMetricUpdate to refresh chart
 watch(() => state.lastMetricUpdate, () => {
-    if (!chartInstance || !isChartActive.value) return
+    console.log('MonitorChart: lastMetricUpdate changed, chartInstance:', !!chartInstance, 'isChartActive:', isChartActive.value)
+    if (!chartInstance || !isChartActive.value) {
+      console.log('MonitorChart: Skipping update - chartInstance or isChartActive is false')
+      return
+    }
     const dataBuffer = state.dataBuffer
+    
+    console.log('MonitorChart: dataBuffer sizes:', {
+      cpu: dataBuffer.cpu.length,
+      gpu: dataBuffer.gpu.length,
+      fps: dataBuffer.fps.length,
+      jank: dataBuffer.jank.length,
+      stutter: dataBuffer.stutter.length,
+      memory: dataBuffer.memory.length,
+      batteryTemp: dataBuffer.batteryTemp.length,
+      network: dataBuffer.network.length
+    })
+    
+    if (dataBuffer.cpu.length === 0) {
+      console.log('MonitorChart: No data in buffer, skipping update')
+      return
+    }
+    
+    const networkRx = dataBuffer.network.map(item => {
+      const [time, value] = item
+      return [time, value?.rx || 0]
+    })
+    
+    const networkTx = dataBuffer.network.map(item => {
+      const [time, value] = item
+      return [time, value?.tx || 0]
+    })
+    
+    console.log('MonitorChart: Updating chart with data, cpu data:', dataBuffer.cpu.slice(-1))
     
     chartInstance.setOption({
       series: [
@@ -400,8 +456,18 @@ watch(() => state.lastMetricUpdate, () => {
         { data: dataBuffer.jank },
         { data: dataBuffer.stutter },
         { data: dataBuffer.memory },
-        { data: dataBuffer.batteryTemp }
+        { data: dataBuffer.batteryTemp },
+        { data: networkRx },
+        { data: networkTx }
       ]
+    })
+    
+    // Always force resize after update
+    nextTick(() => {
+      if (chartInstance) {
+        console.log('MonitorChart: Forcing resize after data update')
+        chartInstance.resize()
+      }
     })
 })
 
@@ -424,7 +490,8 @@ watch(() => props.serial, () => {
     chartInstance.setOption({ 
       series: [
         { data: [] }, { data: [] }, { data: [] }, 
-        { data: [] }, { data: [] }, { data: [] }, { data: [] }
+        { data: [] }, { data: [] }, { data: [] }, { data: [] },
+        { data: [] }, { data: [] }
       ] 
     })
   }
@@ -446,6 +513,17 @@ onActivated(() => {
     // Force update chart with latest buffer
     if (chartInstance) {
         const dataBuffer = state.dataBuffer
+        
+        const networkRx = dataBuffer.network.map(item => {
+          const [time, value] = item
+          return [time, value?.rx || 0]
+        })
+        
+        const networkTx = dataBuffer.network.map(item => {
+          const [time, value] = item
+          return [time, value?.tx || 0]
+        })
+        
         chartInstance.setOption({
             series: [
                 { data: dataBuffer.cpu },
@@ -454,7 +532,9 @@ onActivated(() => {
                 { data: dataBuffer.jank },
                 { data: dataBuffer.stutter },
                 { data: dataBuffer.memory },
-                { data: dataBuffer.batteryTemp }
+                { data: dataBuffer.batteryTemp },
+                { data: networkRx },
+                { data: networkTx }
             ]
         })
     }
@@ -516,6 +596,22 @@ onUnmounted(() => {
         <button @click="exportData" :disabled="state.dataBuffer.cpu.length === 0" class="action-btn export-btn">
           <span class="btn-icon">📥</span>
           <span class="btn-text">导出 CSV</span>
+        </button>
+        <button @click="() => {
+          console.log('=== Manual Refresh Test ===')
+          console.log('chartInstance:', !!chartInstance)
+          console.log('dataBuffer sizes:', {
+            cpu: state.dataBuffer.cpu.length,
+            gpu: state.dataBuffer.gpu.length,
+            fps: state.dataBuffer.fps.length
+          })
+          if (chartInstance && state.dataBuffer.cpu.length > 0) {
+            chartInstance.resize()
+            console.log('Manual resize called')
+          }
+        }" :disabled="state.dataBuffer.cpu.length === 0" class="action-btn" style="background: #e3f2fd; color: #1976d2; border-color: #1976d2;">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text">测试刷新</span>
         </button>
         <button @click="clearData" class="action-btn clear-btn">
           <span class="btn-icon">🗑️</span>

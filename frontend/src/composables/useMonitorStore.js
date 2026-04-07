@@ -128,6 +128,18 @@ export const useMonitorStore = () => {
         }
 
         const now = new Date(data.timestamp)
+        console.log('Store: Processing monitor data:', {
+          timestamp: data.timestamp,
+          now: now,
+          cpu: data.cpu,
+          memory: data.memory,
+          fps: data.fps,
+          jank: data.jank,
+          stutter: data.stutter,
+          gpu: data.gpu,
+          battery: data.battery,
+          network: data.network
+        })
         if (data.package) {
           state.currentPackage = data.package
         }
@@ -154,7 +166,19 @@ export const useMonitorStore = () => {
         state.dataBuffer.batteryTemp.push([now, data.battery ? data.battery.temp : 0])
         state.dataBuffer.network.push([now, data.network || {rx: 0, tx: 0}])
         
+        console.log('Store: After push, buffer sizes:', {
+          cpu: state.dataBuffer.cpu.length,
+          memory: state.dataBuffer.memory.length,
+          fps: state.dataBuffer.fps.length,
+          jank: state.dataBuffer.jank.length,
+          stutter: state.dataBuffer.stutter.length,
+          gpu: state.dataBuffer.gpu.length,
+          batteryTemp: state.dataBuffer.batteryTemp.length,
+          network: state.dataBuffer.network.length
+        })
+        
         state.lastMetricUpdate = Date.now()
+        console.log('Store: Updated lastMetricUpdate to', state.lastMetricUpdate)
       }
 
       ws.onerror = (e) => {
@@ -192,13 +216,16 @@ export const useMonitorStore = () => {
   }
 
   const disconnectWs = () => {
+    console.log('Store: disconnectWs called, ws:', ws, 'readyState:', ws?.readyState)
     if (ws && ws.readyState === WebSocket.OPEN) {
       const msg = { type: "stop" }
+      console.log('Store: Sending stop message:', msg)
       ws.send(JSON.stringify(msg))
       console.log('Store: Sent stop message to server')
       
       // Wait a bit for the server to process the stop message before closing
       setTimeout(() => {
+        console.log('Store: Closing WebSocket after stop message')
         if (ws) {
           ws.onclose = null
           ws.close(1000, 'Client disconnect')
@@ -219,6 +246,7 @@ export const useMonitorStore = () => {
       return
     }
     
+    console.log('Store: WebSocket not open, cleaning up')
     currentSerial = null
     currentTarget = null
     state.reconnectAttempts = 0

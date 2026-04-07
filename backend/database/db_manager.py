@@ -139,10 +139,14 @@ class PerformanceDataRepository:
             WHERE session_id = %s
             """
             
+            logger.info(f"Executing SQL: {query}")
+            logger.info(f"Params: {params}")
+            
             rows_affected = await self.db.execute_update(query, tuple(params))
+            logger.info(f"Rows affected: {rows_affected}")
             return rows_affected > 0
         except Exception as e:
-            logger.error(f"Failed to update test session: {e}")
+            logger.error(f"Failed to update test session: {e}", exc_info=True)
             return False
     
     async def save_performance_metrics(self, session_id: str, metrics: Dict[str, Any]) -> int:

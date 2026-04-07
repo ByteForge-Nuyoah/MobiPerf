@@ -282,8 +282,8 @@ class AndroidCollector:
             # Network
             network_info = self._get_network_usage(self.target_package)
             
-            # Debug log
-            # logger.info(f"Collected: CPU={cpu_usage:.1f}% FPS={fps} GPU={gpu_usage:.1f}%")
+            # Debug log for network data
+            logger.info(f"Network data collected: rx={network_info.get('rx', 0)}, tx={network_info.get('tx', 0)}")
 
         return {
             "type": "monitor",
@@ -730,73 +730,72 @@ class AndroidCollector:
         
         try:
             # 1. 尝试获取 UID 流量 (单应用精准流量)
-            # 优先尝试 Android 9- 的 proc 方式，或者 dumpsys (如果已实现)
             uid = None
             if package:
                 try:
                     uid_output = self.device.shell(f"dumpsys package {package} | grep userId=")
+                    logger.debug(f"UID output for {package}: {uid_output}")
                     if uid_output:
                         uid = uid_output.strip().split("userId=")[1].split()[0]
-                except:
-                    pass
+                        logger.info(f"Found UID for {package}: {uid}")
+                except Exception as e:
+                    logger.warning(f"Failed to get UID for {package}: {e}")
             
             if uid:
                 # 方法 A: /proc/uid_stat/{uid} (Android 9 及以下)
                 try:
-                    rx = self.device.shell(f"cat /proc/uid_stat/{uid}/tcp_rcv").strip()
-                    tx = self.device.shell(f"cat /proc/uid_stat/{uid}/tcp_snd").strip()
-                    if rx.isdigit() and tx.isdigit():
+                    rx = self.device.shell(f"cat /proc/uid_stat/{uid}/tcp_rcv 2>/dev/null").strip()
+                    tx = self.device.shell(f"cat /proc/uid_stat/{uid}/tcp_snd 2>/dev/null").strip()
+                    if rx and rx.isdigit() and tx and tx.isdigit():
                         current_rx = int(rx)
                         current_tx = int(tx)
                         found_data = True
-                except:
-                    pass
+                        logger.info(f"Got network from /proc/uid_stat: rx={current_rx}, tx={current_tx}")
+                except Exception as e:
+                    logger.debug(f"/proc/uid_stat not available: {e}")
                 
                 # 方法 B: /proc/net/xt_qtaguid/stats (Android 9 及以下)
                 if not found_data:
                     try:
-                        output = self.device.shell(f"cat /proc/net/xt_qtaguid/stats | grep {uid}")
+                        output = self.device.shell(f"cat /proc/net/xt_qtaguid/stats 2>/dev/null | grep {uid}")
                         if output:
                             total_rx = 0
                             total_tx = 0
                             for line in output.splitlines():
                                 parts = line.split()
-                                # idx iface acct_tag_hex uid_tag_int cnt_set rx_bytes rx_packets tx_bytes ...
                                 if len(parts) > 8 and parts[3] == uid:
                                     total_rx += int(parts[5])
                                     total_tx += int(parts[7])
-                            current_rx = total_rx
-                            current_tx = total_tx
-                            found_data = True
-                    except:
-                        pass
+                            if total_rx > 0 or total_tx > 0:
+                                current_rx = total_rx
+                                current_tx = total_tx
+                                found_data = True
+                                logger.info(f"Got network from xt_qtaguid: rx={current_rx}, tx={current_tx}")
+                    except Exception as e:
+                        logger.debug(f"/proc/net/xt_qtaguid/stats not available: {e}")
 
             # 2. Fallback: 获取整机流量 (Android 10+ 无法获取 UID 流量时的兜底方案)
-            # /proc/net/dev 是大多数 Android 版本都可读的
             if not found_data:
                 try:
-                    output = self.device.shell("cat /proc/net/dev")
-                    # Inter-|   Receive                                                |  Transmit
-                    #  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets ...
-                    # wlan0: 12345 ...
+                    output = self.device.shell("cat /proc/net/dev 2>/dev/null")
                     if output:
                         lines = output.splitlines()
                         for line in lines:
-                            # 过滤掉 lo (本地环回) 和 tun (VPN)
                             if "wlan" in line or "rmnet" in line or "eth" in line:
                                 parts = line.split(":")
                                 if len(parts) > 1:
-                                    # 注意：部分设备可能没有空格，需要仔细 split
                                     data_parts = parts[1].split()
                                     if len(data_parts) >= 9:
-                                        current_rx += int(data_parts[0]) # Receive bytes
-                                        current_tx += int(data_parts[8]) # Transmit bytes
+                                        rx_bytes = int(data_parts[0])
+                                        tx_bytes = int(data_parts[8])
+                                        current_rx += rx_bytes
+                                        current_tx += tx_bytes
                                         found_data = True
-                except:
-                    pass
+                                        logger.info(f"Got network from /proc/net/dev ({parts[0].strip()}): rx={rx_bytes}, tx={tx_bytes}")
+                except Exception as e:
+                    logger.warning(f"Failed to get network from /proc/net/dev: {e}")
 
             # 3. 计算差分 (Rate Calculation)
-            # 只有当获取到有效数据时才计算
             if found_data:
                 if hasattr(self, '_last_network_data') and self._last_network_data:
                     last_rx, last_tx, last_time = self._last_network_data
@@ -807,24 +806,22 @@ class AndroidCollector:
                         diff_rx = current_rx - last_rx
                         diff_tx = current_tx - last_tx
                         
-                        # 处理计数器溢出或重启的情况
                         if diff_rx < 0: diff_rx = 0
                         if diff_tx < 0: diff_tx = 0
                         
-                        # 转换为 KB/s
                         info["rx"] = round(diff_rx / 1024 / time_diff, 1)
                         info["tx"] = round(diff_tx / 1024 / time_diff, 1)
+                        logger.info(f"Network rate calculated: rx={info['rx']} KB/s, tx={info['tx']} KB/s (diff_rx={diff_rx}, diff_tx={diff_tx}, time_diff={time_diff:.2f}s)")
                 
-                # 更新 Last Data
                 self._last_network_data = (current_rx, current_tx, time.time())
             else:
-                # 如果完全获取不到数据，重置
+                logger.warning("No network data found, resetting _last_network_data")
                 self._last_network_data = None
 
         except Exception as e:
             if "not found" in str(e) or "offline" in str(e):
                 raise e
-            pass
+            logger.error(f"Network collection error: {e}")
             
         return info
 

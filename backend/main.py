@@ -148,6 +148,39 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get(
+    "/api/cache/stats",
+    summary="获取缓存统计信息",
+    description="获取Redis缓存的使用统计信息",
+    tags=["系统"]
+)
+async def get_cache_stats():
+    """获取缓存统计信息
+    
+    Returns:
+        缓存后端类型、连接状态、键数量和内存使用情况
+    """
+    stats = await cache.get_stats()
+    return {
+        "backend": "redis" if cache._use_redis else "memory",
+        **stats
+    }
+
+@app.post(
+    "/api/cache/clear",
+    summary="清除缓存",
+    description="清除所有缓存数据",
+    tags=["系统"]
+)
+async def clear_cache(current_user: Dict = Depends(get_current_active_user)):
+    """清除缓存
+    
+    Returns:
+        成功消息
+    """
+    await cache.clear()
+    return {"message": "缓存已清除"}
+
 # Ensure static/screenshots exists
 SCREENSHOT_DIR = "static/screenshots"
 if os.path.exists(SCREENSHOT_DIR):
@@ -898,6 +931,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                     logger.info(f"Received message: {msg}")
                     
                     if msg.get("type") == "start":
+                        logger.info(f"Processing start message, repository={repository is not None}")
                         target = msg.get("target")
                         collector.set_target(target)
                         if not collector.running:
@@ -907,6 +941,7 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                         if repository:
                             try:
                                 session_start_time = datetime.now()
+                                logger.info(f"Creating database session: session_id={session_id}, device_model={collector.device_model if hasattr(collector, 'device_model') else 'Unknown'}, serial={serial}, target={target}")
                                 created_id = await repository.create_test_session({
                                     'session_id': session_id,
                                     'device_model': collector.device_model if hasattr(collector, 'device_model') else 'Unknown',
@@ -916,11 +951,13 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
                                 })
                                 if created_id:
                                     session_created = True
-                                    logger.info(f"Created database session: {session_id}")
+                                    logger.info(f"✅ Created database session: {session_id}")
                                 else:
-                                    logger.warning(f"Failed to create database session: {session_id}")
+                                    logger.warning(f"❌ Failed to create database session: {session_id}, created_id is None or False")
                             except Exception as e:
-                                logger.error(f"Failed to create database session: {e}")
+                                logger.error(f"❌ Exception creating database session: {e}", exc_info=True)
+                        else:
+                            logger.warning(f"⚠️ Repository is None, cannot create database session")
                         
                         # initialize CSV recorder
                         try:
@@ -1051,7 +1088,24 @@ async def websocket_endpoint(websocket: WebSocket, serial: str):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
+        logger.info(f"Cleaning up WebSocket for {serial}, session_created={session_created}, session_id={session_id}")
         collector.stop()
+        
+        # Update session status when WebSocket disconnects
+        if repository and session_created and session_id:
+            try:
+                end_time = datetime.now()
+                duration = int((end_time - session_start_time).total_seconds()) if session_start_time else 0
+                logger.info(f"Updating session {session_id} on disconnect: end_time={end_time}, duration={duration}")
+                await repository.update_test_session(session_id, {
+                    'end_time': end_time,
+                    'status': 'completed',
+                    'duration': duration
+                })
+                logger.info(f"Updated session {session_id} on WebSocket disconnect")
+            except Exception as e:
+                logger.error(f"Failed to update session on disconnect: {e}")
+        
         try:
             if record_fp:
                 record_fp.flush()
